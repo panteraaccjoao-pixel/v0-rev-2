@@ -1,11 +1,27 @@
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
+import { Inter, PT_Sans, Open_Sans, Josefin_Sans } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 
 const inter = Inter({ 
   subsets: ["latin"],
   variable: '--font-inter'
+});
+
+const ptSans = PT_Sans({
+  subsets: ["latin"],
+  weight: ["400", "700"],
+  variable: '--font-pt-sans'
+});
+
+const openSans = Open_Sans({
+  subsets: ["latin"],
+  variable: '--font-open-sans'
+});
+
+const josefinSans = Josefin_Sans({
+  subsets: ["latin"],
+  variable: '--font-josefin-sans'
 });
 
 export const metadata: Metadata = {
@@ -38,7 +54,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR" className="bg-background">
-      <body className={`${inter.variable} font-sans antialiased`}>
+      <body className={`${inter.variable} ${ptSans.variable} ${openSans.variable} ${josefinSans.variable} font-sans antialiased`}>
         {children}
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>

@@ -20,14 +20,14 @@ export function Hero() {
         </div>
         
         {/* Title */}
-        <h1 className="mb-6 text-balance text-5xl font-bold tracking-tight text-foreground md:text-7xl">
+        <h1 className="text-balance text-5xl font-thin tracking-tight text-foreground shadow-inner md:text-7xl" style={{ fontFamily: 'var(--font-pt-sans)' }}>
           REV SYSTEM
         </h1>
         
         {/* Subtitle */}
         <p className="mb-4 text-balance text-xl text-muted-foreground md:text-2xl">
           A plataforma mais confiável para{" "}
-          <span className="font-semibold text-accent">cartões digitais</span>
+          <span className="font-semibold" style={{ color: '#ff0000' }}>cartões digitais</span>
         </p>
         
         {/* Description */}

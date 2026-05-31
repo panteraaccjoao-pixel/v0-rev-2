@@ -8,7 +8,7 @@ export function Footer() {
         <div className="grid gap-8 md:grid-cols-3">
           {/* Brand */}
           <div className="space-y-4">
-            <h3 className="text-lg font-bold tracking-tight text-foreground">REV SYSTEM</h3>
+            <h3 className="text-lg font-bold tracking-tight text-foreground">REV</h3>
             <p className="text-sm leading-relaxed text-muted-foreground">
               A plataforma mais confiável para compra de cartões digitais. 
               Segurança, velocidade e qualidade garantidas.
