@@ -110,32 +110,6 @@ export default function RegisterPage() {
               </div>
             </div>
 
-            {/* ID de indicação */}
-            <div className="space-y-2">
-              <Label htmlFor="referral">ID de indicação (opcional)</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="referral"
-                  type="text"
-                  placeholder="Cole o ID de indicação aqui"
-                  value={referralId}
-                  onChange={(e) => setReferralId(e.target.value)}
-                  className="h-12 bg-secondary border-border"
-                />
-                <Button 
-                  type="button" 
-                  variant="secondary" 
-                  className="h-12 px-6"
-                  disabled={!referralId}
-                >
-                  Validar
-                </Button>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Se alguém te indicou, cole o ID de indicação aqui.
-              </p>
-            </div>
-
             {/* Verificação de segurança (placeholder for captcha) */}
             <div className="space-y-2">
               <Label>Verificação de segurança</Label>
