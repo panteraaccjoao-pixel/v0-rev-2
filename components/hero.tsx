@@ -15,23 +15,23 @@ export function Hero() {
         {/* Badge */}
         <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-border bg-secondary/50 px-4 py-2 text-sm text-muted-foreground">
           <CreditCard className="h-4 w-4" />
-          <span style={{ fontFamily: '"Open Sans", sans-serif' }}>Cartões com qualidade</span>
-          <span className="text-accent underline decoration-accent underline-offset-2" style={{ fontFamily: '"Montserrat", sans-serif' }}>garantida</span>
+          <span>Cartões com qualidade</span>
+          <span className="text-accent underline decoration-accent underline-offset-2">garantida</span>
         </div>
         
         {/* Title */}
-        <h1 className="text-balance text-5xl font-bold tracking-tight text-foreground shadow-inner md:text-7xl" style={{ fontFamily: '"Montserrat", sans-serif' }}>
+        <h1 className="mb-6 text-balance text-5xl font-bold tracking-tight text-foreground md:text-7xl">
           REV SYSTEM
         </h1>
         
         {/* Subtitle */}
-        <p className="mb-4 text-balance text-xl text-muted-foreground md:text-2xl font-medium" style={{ fontFamily: '"Montserrat", sans-serif' }}>
+        <p className="mb-4 text-balance text-xl text-muted-foreground md:text-2xl">
           A plataforma mais confiável para{" "}
-          <span className="font-semibold" style={{ color: '#ff0000' }}>cartões digitais</span>
+          <span className="font-semibold text-accent">cartões digitais</span>
         </p>
         
         {/* Description */}
-        <p className="mb-8 max-w-xl text-pretty text-muted-foreground font-semibold" style={{ fontFamily: '"Montserrat", sans-serif' }}>
+        <p className="mb-8 max-w-xl text-pretty text-muted-foreground">
           Compre cartões de forma simples, segura e instantânea. Entrega em segundos, 
           suporte 24/7 e garantia total.
         </p>
@@ -40,20 +40,20 @@ export function Hero() {
         <div className="mb-8 flex flex-wrap items-center justify-center gap-6 text-sm text-muted-foreground">
           <div className="flex items-center gap-2">
             <Zap className="h-4 w-4 text-accent" />
-            <span className="font-medium" style={{ fontFamily: '"Montserrat", sans-serif' }}>Entrega Instantânea</span>
+            <span>Entrega Instantânea</span>
           </div>
           <div className="flex items-center gap-2">
             <Users className="h-4 w-4 text-accent" />
-            <span className="font-medium" style={{ fontFamily: '"Montserrat", sans-serif' }}>+10.000 Clientes</span>
+            <span>+10.000 Clientes</span>
           </div>
         </div>
         
         {/* CTAs */}
         <div className="flex flex-wrap items-center justify-center gap-4">
-          <Button size="lg" className="min-w-36 px-[30px]" style={{ fontFamily: '"Montserrat", sans-serif' }} asChild>
+          <Button size="lg" className="min-w-36" asChild>
             <Link href="/register">Criar conta</Link>
           </Button>
-          <Button variant="secondary" size="lg" className="min-w-36" style={{ fontFamily: '"Montserrat", sans-serif' }} asChild>
+          <Button variant="secondary" size="lg" className="min-w-36" asChild>
             <Link href="/login">Fazer login</Link>
           </Button>
         </div>
