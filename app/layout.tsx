@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { Inter, PT_Sans, Open_Sans, Josefin_Sans } from 'next/font/google'
+import { Inter, PT_Sans, Open_Sans, Josefin_Sans, Outfit, Inconsolata, Montserrat, Roboto } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 
@@ -22,6 +22,27 @@ const openSans = Open_Sans({
 const josefinSans = Josefin_Sans({
   subsets: ["latin"],
   variable: '--font-josefin-sans'
+});
+
+const outfit = Outfit({
+  subsets: ["latin"],
+  variable: '--font-outfit'
+});
+
+const inconsolata = Inconsolata({
+  subsets: ["latin"],
+  variable: '--font-inconsolata'
+});
+
+const montserrat = Montserrat({
+  subsets: ["latin"],
+  variable: '--font-montserrat'
+});
+
+const roboto = Roboto({
+  subsets: ["latin"],
+  weight: ["400", "500", "700"],
+  variable: '--font-roboto'
 });
 
 export const metadata: Metadata = {
@@ -54,7 +75,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR" className="bg-background">
-      <body className={`${inter.variable} ${ptSans.variable} ${openSans.variable} ${josefinSans.variable} font-sans antialiased`}>
+      <body className={`${inter.variable} ${ptSans.variable} ${openSans.variable} ${josefinSans.variable} ${outfit.variable} ${inconsolata.variable} ${montserrat.variable} ${roboto.variable} font-sans antialiased`}>
         {children}
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
