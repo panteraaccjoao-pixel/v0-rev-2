@@ -8,7 +8,7 @@ export function Footer() {
         <div className="grid gap-8 md:grid-cols-3">
           {/* Brand */}
           <div className="space-y-4">
-            <h3 className="text-lg font-bold tracking-tight text-foreground">KNIGHT</h3>
+            <h3 className="text-lg font-bold tracking-tight text-foreground">REV SYSTEM</h3>
             <p className="text-sm leading-relaxed text-muted-foreground">
               A plataforma mais confiável para compra de cartões digitais. 
               Segurança, velocidade e qualidade garantidas.
@@ -61,7 +61,7 @@ export function Footer() {
         {/* Copyright */}
         <div className="mt-12 border-t border-border pt-6">
           <p className="text-center text-sm text-muted-foreground">
-            © {new Date().getFullYear()} KNIGHT. Todos os direitos reservados.
+            © {new Date().getFullYear()} REV SYSTEM. Todos os direitos reservados.
           </p>
         </div>
       </div>

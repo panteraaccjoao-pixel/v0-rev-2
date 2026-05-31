@@ -10,9 +10,9 @@ export function Header() {
       <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 md:px-6">
         <Link href="/" className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-secondary text-sm font-bold text-foreground">
-            K
+            R
           </div>
-          <span className="text-sm font-semibold tracking-tight text-foreground">KNIGHT</span>
+          <span className="text-sm font-semibold tracking-tight text-foreground">REV SYSTEM</span>
         </Link>
         
         <Button variant="secondary" size="sm" className="gap-2" asChild>

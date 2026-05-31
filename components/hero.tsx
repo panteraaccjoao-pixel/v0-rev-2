@@ -21,7 +21,7 @@ export function Hero() {
         
         {/* Title */}
         <h1 className="mb-6 text-balance text-5xl font-bold tracking-tight text-foreground md:text-7xl">
-          KNIGHT
+          REV SYSTEM
         </h1>
         
         {/* Subtitle */}

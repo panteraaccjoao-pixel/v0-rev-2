@@ -9,7 +9,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: 'KNIGHT - Cartões Digitais',
+  title: 'REV SYSTEM - Cartões Digitais',
   description: 'A plataforma mais confiável para cartões digitais. Compre cartões de forma simples, segura e instantânea.',
   generator: 'v0.app',
   icons: {
