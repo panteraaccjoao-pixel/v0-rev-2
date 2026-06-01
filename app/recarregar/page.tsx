@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label"
 const presetValues = [10, 25, 50, 100, 200, 500]
 
 export default function RecargaPage() {
-  const [selectedValue, setSelectedValue] = useState<number | null>(null)
+  const [totalValue, setTotalValue] = useState(0)
   const [customValue, setCustomValue] = useState("")
   const [copied, setCopied] = useState(false)
 
@@ -20,7 +20,17 @@ export default function RecargaPage() {
     setTimeout(() => setCopied(false), 2000)
   }
 
-  const finalValue = selectedValue || (customValue ? parseFloat(customValue) : 0)
+  const handleAddValue = (value: number) => {
+    setTotalValue((prev) => prev + value)
+    setCustomValue("")
+  }
+
+  const handleClearValue = () => {
+    setTotalValue(0)
+    setCustomValue("")
+  }
+
+  const finalValue = totalValue || (customValue ? parseFloat(customValue) : 0)
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -56,25 +66,33 @@ export default function RecargaPage() {
 
           {/* Preset values */}
           <div className="space-y-3">
-            <Label>Valores sugeridos</Label>
+            <div className="flex items-center justify-between">
+              <Label>Valores sugeridos</Label>
+              {totalValue > 0 && (
+                <button
+                  onClick={handleClearValue}
+                  className="text-sm text-muted-foreground hover:text-accent transition-colors"
+                >
+                  Limpar
+                </button>
+              )}
+            </div>
             <div className="grid grid-cols-3 gap-3">
               {presetValues.map((value) => (
                 <button
                   key={value}
-                  onClick={() => {
-                    setSelectedValue(value)
-                    setCustomValue("")
-                  }}
-                  className={`rounded-lg border p-4 text-center transition-all ${
-                    selectedValue === value
-                      ? "border-accent bg-accent/10 text-accent"
-                      : "border-border bg-secondary hover:border-muted-foreground"
-                  }`}
+                  onClick={() => handleAddValue(value)}
+                  className="rounded-lg border border-border bg-secondary p-4 text-center transition-all hover:border-accent hover:bg-accent/10"
                 >
                   <span className="text-lg font-semibold">R$ {value}</span>
                 </button>
               ))}
             </div>
+            {totalValue > 0 && (
+              <p className="text-sm text-muted-foreground text-center">
+                Clique novamente para adicionar mais ao valor
+              </p>
+            )}
           </div>
 
           {/* Custom value */}
@@ -91,7 +109,7 @@ export default function RecargaPage() {
                 value={customValue}
                 onChange={(e) => {
                   setCustomValue(e.target.value)
-                  setSelectedValue(null)
+                  setTotalValue(0)
                 }}
                 className="h-12 bg-secondary border-border pl-12"
                 min="5"
