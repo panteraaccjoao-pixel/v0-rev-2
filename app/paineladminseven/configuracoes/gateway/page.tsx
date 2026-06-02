@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -33,10 +33,12 @@ export default function GatewayPage() {
   const [isTesting, setIsTesting] = useState(false)
   const [testResult, setTestResult] = useState<"success" | "error" | null>(null)
   const [isSaving, setIsSaving] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
   const [copied, setCopied] = useState(false)
+  const [saveMessage, setSaveMessage] = useState<string | null>(null)
   
   const [config, setConfig] = useState({
-    gateway: "mercadopago",
+    gateway: "",
     environment: "sandbox",
     apiKey: "",
     secretKey: "",
@@ -47,6 +49,31 @@ export default function GatewayPage() {
   const webhookUrl = typeof window !== "undefined" 
     ? `${window.location.origin}/api/webhook/pagamento`
     : "/api/webhook/pagamento"
+
+  // Load existing config on mount
+  useEffect(() => {
+    async function loadConfig() {
+      try {
+        const res = await fetch("/api/admin/config")
+        const data = await res.json()
+        if (data.gatewayConfig) {
+          setConfig({
+            gateway: data.gatewayConfig.gateway || "",
+            environment: data.gatewayConfig.environment || "sandbox",
+            apiKey: data.gatewayConfig.apiKey || "",
+            secretKey: data.gatewayConfig.secretKey || "",
+            pixKey: data.gatewayConfig.pixKey || "",
+            webhookSecret: data.gatewayConfig.webhookSecret || "",
+          })
+        }
+      } catch (error) {
+        console.error("Erro ao carregar configuracoes:", error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    loadConfig()
+  }, [])
 
   const handleCopyWebhook = () => {
     navigator.clipboard.writeText(webhookUrl)
@@ -79,16 +106,34 @@ export default function GatewayPage() {
 
   const handleSave = async () => {
     setIsSaving(true)
+    setSaveMessage(null)
     
     try {
-      await fetch("/api/admin/config", {
+      const res = await fetch("/api/admin/config", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type: "gateway", config }),
       })
+      
+      const data = await res.json()
+      if (data.success) {
+        setSaveMessage("Configuracoes salvas com sucesso!")
+        setTimeout(() => setSaveMessage(null), 3000)
+      }
+    } catch (error) {
+      console.error("Erro ao salvar:", error)
+      setSaveMessage("Erro ao salvar configuracoes")
     } finally {
       setIsSaving(false)
     }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
   }
 
   return (
@@ -215,19 +260,21 @@ export default function GatewayPage() {
           </div>
         </div>
 
-        {testResult && (
+        {(testResult || saveMessage) && (
           <div className={`flex items-center gap-2 rounded-lg p-3 ${
-            testResult === "success" ? "bg-green-500/10 text-green-500" : "bg-red-500/10 text-red-500"
+            testResult === "success" || (saveMessage && !saveMessage.includes("Erro")) 
+              ? "bg-green-500/10 text-green-500" 
+              : "bg-red-500/10 text-red-500"
           }`}>
-            {testResult === "success" ? (
+            {testResult === "success" || (saveMessage && !saveMessage.includes("Erro")) ? (
               <>
                 <CheckCircle2 className="h-5 w-5" />
-                <span>Gateway conectada com sucesso!</span>
+                <span>{saveMessage || "Gateway conectada com sucesso!"}</span>
               </>
             ) : (
               <>
                 <XCircle className="h-5 w-5" />
-                <span>Falha na conexao. Verifique as credenciais.</span>
+                <span>{saveMessage || "Falha na conexao. Verifique as credenciais."}</span>
               </>
             )}
           </div>

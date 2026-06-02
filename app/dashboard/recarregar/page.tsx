@@ -171,7 +171,7 @@ export default function RecarregarPage() {
                 onClick={() => {
                   setRechargeValue(prev => prev + item.value)
                   setCustomValue("")
-                  setPixCode(null)
+                  setPixData(null)
                 }}
                 className="rounded-lg border border-border bg-card px-4 py-4 text-center font-semibold transition-all hover:border-accent hover:bg-accent/10 active:scale-95"
               >
