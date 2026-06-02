@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { 
   LayoutDashboard, 
   Users, 
@@ -21,6 +21,7 @@ import {
   ChevronDown
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { AdminAuthGuard } from "@/components/admin-auth-guard"
 
 const sidebarItems = [
   { name: "Dashboard", href: "/paineladminseven", icon: LayoutDashboard },
@@ -52,9 +53,22 @@ export default function AdminLayout({
   children: React.ReactNode
 }) {
   const pathname = usePathname()
+  const router = useRouter()
+
+  // If on login page, render without sidebar
+  if (pathname === "/paineladminseven/login") {
+    return <>{children}</>
+  }
+
+  const handleLogout = () => {
+    localStorage.removeItem("admin_session")
+    fetch("/api/admin/auth", { method: "DELETE" })
+    router.push("/paineladminseven/login")
+  }
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <AdminAuthGuard>
+      <div className="flex min-h-screen bg-background">
       {/* Sidebar */}
       <aside className="fixed left-0 top-0 z-40 h-screen w-64 border-r border-border bg-card">
         <div className="flex h-full flex-col">
@@ -128,13 +142,13 @@ export default function AdminLayout({
 
           {/* Footer */}
           <div className="border-t border-border p-4">
-            <Link
-              href="/"
-              className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+            <button
+              onClick={handleLogout}
+              className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
             >
               <LogOut className="h-5 w-5" />
               Sair do Painel
-            </Link>
+            </button>
           </div>
         </div>
       </aside>
@@ -144,5 +158,6 @@ export default function AdminLayout({
         {children}
       </main>
     </div>
+    </AdminAuthGuard>
   )
 }
