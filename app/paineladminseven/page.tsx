@@ -1,13 +1,17 @@
 "use client"
 
+import { useState, useEffect, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import { 
   DollarSign, 
   TrendingUp, 
   ShoppingCart, 
   Wallet,
   ArrowUpRight,
-  ArrowDownRight
+  ArrowDownRight,
+  RefreshCw,
+  RotateCcw
 } from "lucide-react"
 import {
   LineChart,
@@ -19,42 +23,131 @@ import {
   ResponsiveContainer,
 } from "recharts"
 
-// Dados de exemplo para o gráfico
-const chartData = [
-  { day: "01/01", vendas: 1200, recargas: 800 },
-  { day: "02/01", vendas: 1800, recargas: 1200 },
-  { day: "03/01", vendas: 2200, recargas: 1500 },
-  { day: "04/01", vendas: 1600, recargas: 900 },
-  { day: "05/01", vendas: 2800, recargas: 2000 },
-  { day: "06/01", vendas: 3200, recargas: 2400 },
-  { day: "07/01", vendas: 2400, recargas: 1800 },
-  { day: "08/01", vendas: 2900, recargas: 2100 },
-  { day: "09/01", vendas: 3500, recargas: 2600 },
-  { day: "10/01", vendas: 3100, recargas: 2300 },
-  { day: "11/01", vendas: 2700, recargas: 1900 },
-  { day: "12/01", vendas: 3800, recargas: 2800 },
-  { day: "13/01", vendas: 4200, recargas: 3100 },
-  { day: "14/01", vendas: 3600, recargas: 2500 },
-]
-
-// Dados de exemplo para vendas recentes
-const recentSales = [
-  { id: 1, user: "joao@email.com", product: "CC Platinum", value: 45.00, time: "2 min" },
-  { id: 2, user: "maria@email.com", product: "CC Gold", value: 35.00, time: "5 min" },
-  { id: 3, user: "pedro@email.com", product: "CC Platinum", value: 45.00, time: "12 min" },
-  { id: 4, user: "ana@email.com", product: "CC Black", value: 80.00, time: "18 min" },
-  { id: 5, user: "lucas@email.com", product: "CC Gold", value: 35.00, time: "25 min" },
-]
+interface Stats {
+  faturamento: number
+  saques: number
+  vendas: number
+  ticketMedio: number
+  dailyData: { date: string; faturamento: number; vendas: number }[]
+  recentSales: { id: string; user: string; product: string; value: number; date: string }[]
+  lastUpdated: string
+}
 
 export default function AdminDashboard() {
+  const [stats, setStats] = useState<Stats>({
+    faturamento: 0,
+    saques: 0,
+    vendas: 0,
+    ticketMedio: 0,
+    dailyData: [],
+    recentSales: [],
+    lastUpdated: new Date().toISOString()
+  })
+  const [loading, setLoading] = useState(true)
+  const [resetting, setResetting] = useState(false)
+
+  const fetchStats = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/stats")
+      if (res.ok) {
+        const data = await res.json()
+        setStats(data)
+      }
+    } catch (error) {
+      console.error("Error fetching stats:", error)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchStats()
+    
+    // Poll for updates every 5 seconds
+    const interval = setInterval(fetchStats, 5000)
+    return () => clearInterval(interval)
+  }, [fetchStats])
+
+  const handleReset = async () => {
+    setResetting(true)
+    try {
+      await fetch("/api/admin/stats", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "reset" })
+      })
+      await fetchStats()
+    } catch (error) {
+      console.error("Error resetting stats:", error)
+    } finally {
+      setResetting(false)
+    }
+  }
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL"
+    }).format(value)
+  }
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString)
+    return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
+  }
+
+  const formatTime = (dateString: string) => {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diff = Math.floor((now.getTime() - date.getTime()) / 1000 / 60)
+    
+    if (diff < 1) return "agora"
+    if (diff < 60) return `${diff} min`
+    if (diff < 1440) return `${Math.floor(diff / 60)} h`
+    return `${Math.floor(diff / 1440)} d`
+  }
+
+  // Transform daily data for chart
+  const chartData = stats.dailyData.map(d => ({
+    day: formatDate(d.date),
+    vendas: d.faturamento,
+    quantidade: d.vendas
+  }))
+
+  // Add empty days if no data
+  if (chartData.length === 0) {
+    const today = new Date()
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date(today)
+      date.setDate(date.getDate() - i)
+      chartData.push({
+        day: formatDate(date.toISOString()),
+        vendas: 0,
+        quantidade: 0
+      })
+    }
+  }
+
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground">
-          Visão geral do seu negócio
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-muted-foreground">
+            Visão geral do seu negócio em tempo real
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={fetchStats} disabled={loading}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
+            Atualizar
+          </Button>
+          <Button variant="destructive" size="sm" onClick={handleReset} disabled={resetting}>
+            <RotateCcw className={`h-4 w-4 mr-2 ${resetting ? "animate-spin" : ""}`} />
+            Resetar
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -67,10 +160,16 @@ export default function AdminDashboard() {
             <DollarSign className="h-4 w-4 text-accent" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">R$ 45.231,89</div>
+            <div className="text-2xl font-bold">{formatCurrency(stats.faturamento)}</div>
             <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-              <ArrowUpRight className="h-3 w-3 text-green-500" />
-              <span className="text-green-500">+20.1%</span> desde o mês passado
+              {stats.faturamento > 0 ? (
+                <>
+                  <ArrowUpRight className="h-3 w-3 text-green-500" />
+                  <span className="text-green-500">Atualizado em tempo real</span>
+                </>
+              ) : (
+                <span>Aguardando vendas</span>
+              )}
             </p>
           </CardContent>
         </Card>
@@ -83,10 +182,16 @@ export default function AdminDashboard() {
             <Wallet className="h-4 w-4 text-accent" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">R$ 32.450,00</div>
+            <div className="text-2xl font-bold">{formatCurrency(stats.saques)}</div>
             <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-              <ArrowUpRight className="h-3 w-3 text-green-500" />
-              <span className="text-green-500">+15.3%</span> desde o mês passado
+              {stats.saques > 0 ? (
+                <>
+                  <ArrowDownRight className="h-3 w-3 text-red-500" />
+                  <span className="text-red-500">Saques realizados</span>
+                </>
+              ) : (
+                <span>Nenhum saque ainda</span>
+              )}
             </p>
           </CardContent>
         </Card>
@@ -99,10 +204,13 @@ export default function AdminDashboard() {
             <TrendingUp className="h-4 w-4 text-accent" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">R$ 48,50</div>
+            <div className="text-2xl font-bold">{formatCurrency(stats.ticketMedio)}</div>
             <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-              <ArrowDownRight className="h-3 w-3 text-red-500" />
-              <span className="text-red-500">-2.4%</span> desde o mês passado
+              {stats.vendas > 0 ? (
+                <span>Baseado em {stats.vendas} venda{stats.vendas > 1 ? "s" : ""}</span>
+              ) : (
+                <span>Sem vendas ainda</span>
+              )}
             </p>
           </CardContent>
         </Card>
@@ -115,10 +223,16 @@ export default function AdminDashboard() {
             <ShoppingCart className="h-4 w-4 text-accent" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">932</div>
+            <div className="text-2xl font-bold">{stats.vendas}</div>
             <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-              <ArrowUpRight className="h-3 w-3 text-green-500" />
-              <span className="text-green-500">+12.5%</span> desde o mês passado
+              {stats.vendas > 0 ? (
+                <>
+                  <ArrowUpRight className="h-3 w-3 text-green-500" />
+                  <span className="text-green-500">Vendas confirmadas</span>
+                </>
+              ) : (
+                <span>Aguardando vendas</span>
+              )}
             </p>
           </CardContent>
         </Card>
@@ -129,7 +243,7 @@ export default function AdminDashboard() {
         {/* Chart */}
         <Card className="bg-card border-border lg:col-span-4">
           <CardHeader>
-            <CardTitle>Vendas por Dia</CardTitle>
+            <CardTitle>Faturamento por Dia</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
@@ -157,22 +271,15 @@ export default function AdminDashboard() {
                       borderRadius: "8px",
                     }}
                     labelStyle={{ color: "hsl(var(--foreground))" }}
+                    formatter={(value: number) => [formatCurrency(value), "Faturamento"]}
                   />
                   <Line 
                     type="monotone" 
                     dataKey="vendas" 
                     stroke="hsl(var(--accent))" 
                     strokeWidth={2}
-                    dot={false}
-                    name="Vendas"
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="recargas" 
-                    stroke="hsl(var(--muted-foreground))" 
-                    strokeWidth={2}
-                    dot={false}
-                    name="Recargas"
+                    dot={{ fill: "hsl(var(--accent))", strokeWidth: 2, r: 4 }}
+                    name="Faturamento"
                   />
                 </LineChart>
               </ResponsiveContainer>
@@ -187,24 +294,37 @@ export default function AdminDashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {recentSales.map((sale) => (
-                <div key={sale.id} className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium">{sale.user}</p>
-                    <p className="text-xs text-muted-foreground">{sale.product}</p>
+              {stats.recentSales.length > 0 ? (
+                stats.recentSales.map((sale) => (
+                  <div key={sale.id} className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium">{sale.user}</p>
+                      <p className="text-xs text-muted-foreground">{sale.product}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-medium text-accent">
+                        +{formatCurrency(sale.value)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{formatTime(sale.date)}</p>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm font-medium text-accent">
-                      +R$ {sale.value.toFixed(2)}
-                    </p>
-                    <p className="text-xs text-muted-foreground">{sale.time}</p>
-                  </div>
+                ))
+              ) : (
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <ShoppingCart className="h-8 w-8 text-muted-foreground mb-2" />
+                  <p className="text-sm text-muted-foreground">Nenhuma venda ainda</p>
+                  <p className="text-xs text-muted-foreground">As vendas aparecerão aqui em tempo real</p>
                 </div>
-              ))}
+              )}
             </div>
           </CardContent>
         </Card>
       </div>
+
+      {/* Last Updated */}
+      <p className="text-xs text-muted-foreground text-center">
+        Última atualização: {new Date(stats.lastUpdated).toLocaleString("pt-BR")}
+      </p>
     </div>
   )
 }
