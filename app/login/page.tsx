@@ -69,7 +69,7 @@ export default function LoginPage() {
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-6" suppressHydrationWarning>
             {/* Error message */}
             {error && (
               <div className="rounded-lg border border-red-500/50 bg-red-500/10 px-4 py-3 text-sm text-red-500">
@@ -127,9 +127,8 @@ export default function LoginPage() {
               type="submit" 
               className="h-12 w-full bg-secondary text-secondary-foreground hover:bg-secondary/80"
               disabled={loading}
-              suppressHydrationWarning
             >
-              <span suppressHydrationWarning>{loading ? "Entrando..." : "Entrar"}</span>
+              {loading ? "Entrando..." : "Entrar"}
             </Button>
           </form>
 
