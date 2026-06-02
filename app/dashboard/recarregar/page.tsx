@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation"
 import { ArrowLeft, QrCode, Copy, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { cn } from "@/lib/utils"
 import Link from "next/link"
 
 const predefinedValues = [
@@ -19,7 +18,7 @@ const predefinedValues = [
 
 export default function RecarregarPage() {
   const router = useRouter()
-  const [selectedValue, setSelectedValue] = useState<number | null>(null)
+  const [rechargeValue, setRechargeValue] = useState<number>(0)
   const [customValue, setCustomValue] = useState("")
   const [pixCode, setPixCode] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
@@ -27,7 +26,8 @@ export default function RecarregarPage() {
   const [currentBalance] = useState(0)
 
   const handleValueSelect = (value: number) => {
-    setSelectedValue(value)
+    // Soma o valor ao invés de substituir
+    setRechargeValue(prev => prev + value)
     setCustomValue("")
     setPixCode(null)
   }
@@ -35,14 +35,20 @@ export default function RecarregarPage() {
   const handleCustomValueChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.replace(/\D/g, "")
     setCustomValue(value)
-    setSelectedValue(null)
+    setRechargeValue(0)
     setPixCode(null)
   }
 
   const getFinalValue = () => {
-    if (selectedValue) return selectedValue
+    if (rechargeValue > 0) return rechargeValue
     if (customValue) return parseInt(customValue)
     return 0
+  }
+
+  const handleClearValue = () => {
+    setRechargeValue(0)
+    setCustomValue("")
+    setPixCode(null)
   }
 
   const handleGeneratePix = async () => {
@@ -99,18 +105,42 @@ export default function RecarregarPage() {
           </p>
         </div>
 
+        {/* Recharge Value Display */}
+        {getFinalValue() > 0 && (
+          <div className="mb-6 rounded-lg border-2 border-accent bg-accent/10 p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Valor a recarregar</p>
+                <p className="text-2xl font-bold text-accent">
+                  R$ {getFinalValue().toFixed(2).replace(".", ",")}
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleClearValue}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                Limpar
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Predefined Values */}
         <div className="mb-6">
-          <p className="mb-3 text-sm font-medium text-muted-foreground">Valores sugeridos</p>
+          <p className="mb-3 text-sm font-medium text-muted-foreground">Valores sugeridos <span className="text-xs">(clique para somar)</span></p>
           <div className="grid grid-cols-3 gap-3">
             {predefinedValues.map((item) => (
               <button
                 key={item.value}
-                onClick={() => handleValueSelect(item.value)}
-                className={cn(
-                  "rounded-lg border border-border bg-card px-4 py-4 text-center font-semibold transition-all hover:border-muted-foreground",
-                  selectedValue === item.value && "border-accent bg-accent/10 text-accent"
-                )}
+                type="button"
+                onClick={() => {
+                  setRechargeValue(prev => prev + item.value)
+                  setCustomValue("")
+                  setPixCode(null)
+                }}
+                className="rounded-lg border border-border bg-card px-4 py-4 text-center font-semibold transition-all hover:border-accent hover:bg-accent/10 active:scale-95"
               >
                 {item.label}
               </button>
