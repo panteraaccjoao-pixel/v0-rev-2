@@ -175,7 +175,7 @@ export default function DashboardLayout({
       </aside>
 
       {/* Main content */}
-      <main className="ml-64 flex-1">
+      <main className="ml-64 flex-1 p-6">
         {children}
       </main>
     </div>
