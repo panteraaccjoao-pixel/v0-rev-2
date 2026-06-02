@@ -304,10 +304,10 @@ export default function DuvidasPage() {
                 return (
                   <div
                     key={category.category}
-                    className="rounded-lg border border-border bg-card overflow-hidden"
+                    className="rounded-lg border border-border bg-card p-4"
                   >
                     {/* Category Header */}
-                    <div className="flex items-center justify-between border-b border-border bg-secondary/30 px-4 py-3">
+                    <div className="mb-3 flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Icon className={cn("h-5 w-5", category.iconColor)} />
                         <span className="font-semibold text-foreground">{category.category}</span>
@@ -315,9 +315,9 @@ export default function DuvidasPage() {
                       <span className="text-sm text-muted-foreground">{category.sites.length}</span>
                     </div>
                     {/* Sites List */}
-                    <div className="divide-y divide-border">
+                    <div className="space-y-2">
                       {category.sites.map((site) => (
-                        <div key={site.name} className="px-4 py-3 hover:bg-secondary/30 transition-colors">
+                        <div key={site.name} className="rounded-lg bg-secondary/50 px-4 py-3">
                           <p className="font-medium text-foreground">{site.name}</p>
                           <p className="text-sm text-muted-foreground">{site.description}</p>
                         </div>
@@ -335,10 +335,10 @@ export default function DuvidasPage() {
                 return (
                   <div
                     key={category.category}
-                    className="rounded-lg border border-border bg-card overflow-hidden"
+                    className="rounded-lg border border-border bg-card p-4"
                   >
                     {/* Category Header */}
-                    <div className="flex items-center justify-between border-b border-border bg-secondary/30 px-4 py-3">
+                    <div className="mb-3 flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Icon className={cn("h-5 w-5", category.iconColor)} />
                         <span className="font-semibold text-foreground">{category.category}</span>
@@ -346,9 +346,9 @@ export default function DuvidasPage() {
                       <span className="text-sm text-muted-foreground">{category.sites.length}</span>
                     </div>
                     {/* Sites List */}
-                    <div className="divide-y divide-border">
+                    <div className="space-y-2">
                       {category.sites.map((site) => (
-                        <div key={site.name} className="px-4 py-3 hover:bg-secondary/30 transition-colors">
+                        <div key={site.name} className="rounded-lg bg-secondary/50 px-4 py-3">
                           <p className="font-medium text-foreground">{site.name}</p>
                           <p className="text-sm text-muted-foreground">{site.description}</p>
                         </div>
