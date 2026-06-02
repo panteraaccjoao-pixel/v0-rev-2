@@ -289,12 +289,48 @@ export default function DuvidasPage() {
 
           {/* Sites Recomendados */}
           <div className="mt-8">
-            <div className="mb-4 flex items-center gap-2 text-sm font-medium text-muted-foreground">
-              <CheckCircle className="h-4 w-4" />
-              Sites Recomendados
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                <CheckCircle className="h-4 w-4" />
+                Sites Recomendados
+              </div>
+              <span className="text-sm text-muted-foreground">escolhidos a dedo</span>
             </div>
+            
+            {/* First Row - 4 columns */}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              {sitesRecomendados.map((category) => {
+              {sitesRecomendados.slice(0, 4).map((category) => {
+                const Icon = category.icon
+                return (
+                  <div
+                    key={category.category}
+                    className="rounded-lg border border-border bg-card overflow-hidden"
+                  >
+                    {/* Category Header */}
+                    <div className="flex items-center justify-between border-b border-border bg-secondary/30 px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <Icon className={cn("h-5 w-5", category.iconColor)} />
+                        <span className="font-semibold text-foreground">{category.category}</span>
+                      </div>
+                      <span className="text-sm text-muted-foreground">{category.sites.length}</span>
+                    </div>
+                    {/* Sites List */}
+                    <div className="divide-y divide-border">
+                      {category.sites.map((site) => (
+                        <div key={site.name} className="px-4 py-3 hover:bg-secondary/30 transition-colors">
+                          <p className="font-medium text-foreground">{site.name}</p>
+                          <p className="text-sm text-muted-foreground">{site.description}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Second Row - 2 columns */}
+            <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              {sitesRecomendados.slice(4).map((category) => {
                 const Icon = category.icon
                 return (
                   <div
