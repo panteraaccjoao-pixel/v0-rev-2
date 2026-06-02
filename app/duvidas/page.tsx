@@ -16,7 +16,13 @@ import {
   ShieldCheck,
   Wifi,
   KeyRound,
-  ChevronDown
+  ChevronDown,
+  ShoppingCart,
+  UtensilsCrossed,
+  Heart,
+  PawPrint,
+  Smartphone,
+  MessageCircle
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -82,12 +88,63 @@ const duvidasTecnicas: FaqItem[] = [
 ]
 
 const sitesRecomendados = [
-  { name: "Shopee", url: "https://shopee.com.br" },
-  { name: "AliExpress", url: "https://aliexpress.com" },
-  { name: "Mercado Livre", url: "https://mercadolivre.com.br" },
-  { name: "Amazon", url: "https://amazon.com.br" },
-  { name: "Kabum", url: "https://kabum.com.br" },
-  { name: "Magalu", url: "https://magazineluiza.com.br" },
+  {
+    category: "E-commerce Geral",
+    icon: ShoppingCart,
+    iconColor: "text-blue-400",
+    sites: [
+      { name: "Americanas", description: "Eletrônicos, moda, casa, alimentos, brinquedos e mais" },
+      { name: "Mercado Livre", description: "Marketplace com enorme variedade de produtos" },
+      { name: "Shopee", description: "Produtos variados com preços acessíveis" },
+      { name: "AliExpress", description: "Produtos variados direto da China" },
+    ]
+  },
+  {
+    category: "Alimentação & Bebidas",
+    icon: UtensilsCrossed,
+    iconColor: "text-orange-400",
+    sites: [
+      { name: "Swift", description: "Carnes bovinas, frangos, pescados e congelados" },
+      { name: "iFood", description: "Entrega de comida rápida" },
+      { name: "Wine", description: "Vinhos, espumantes e clube de assinatura" },
+    ]
+  },
+  {
+    category: "Farmácias & Saúde",
+    icon: Heart,
+    iconColor: "text-red-400",
+    sites: [
+      { name: "Pague Menos", description: "Medicamentos, dermocosméticos e nutrição" },
+      { name: "Droga Raia", description: "Farmácia online com ampla variedade" },
+      { name: "Drogaria São Paulo", description: "Medicamentos, higiene e retirada rápida" },
+      { name: "Drogasil", description: "Medicamentos, vacinas, suplementos e beleza" },
+    ]
+  },
+  {
+    category: "Pets & Casa",
+    icon: PawPrint,
+    iconColor: "text-amber-400",
+    sites: [
+      { name: "Cobasi", description: "Rações, acessórios pet, casa, jardim e piscina" },
+    ]
+  },
+  {
+    category: "Beleza & Cuidados",
+    icon: Sparkles,
+    iconColor: "text-pink-400",
+    sites: [
+      { name: "GlamBox", description: "Caixas de beleza por assinatura" },
+    ]
+  },
+  {
+    category: "Tecnologia & Eletrônicos",
+    icon: Smartphone,
+    iconColor: "text-cyan-400",
+    sites: [
+      { name: "Samsung", description: "Smartphones, tablets, TVs e eletrodomésticos" },
+      { name: "Kabum", description: "Periféricos, eletrônicos e componentes" },
+    ]
+  },
 ]
 
 function AccordionItem({ item, isOpen, onToggle }: { item: FaqItem; isOpen: boolean; onToggle: () => void }) {
@@ -236,19 +293,44 @@ export default function DuvidasPage() {
               <CheckCircle className="h-4 w-4" />
               Sites Recomendados
             </div>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-6">
-              {sitesRecomendados.map((site) => (
-                <a
-                  key={site.name}
-                  href={site.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center rounded-lg border border-border bg-card p-4 text-sm font-medium text-muted-foreground transition-colors hover:border-accent hover:text-foreground"
-                >
-                  {site.name}
-                </a>
-              ))}
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              {sitesRecomendados.map((category) => {
+                const Icon = category.icon
+                return (
+                  <div
+                    key={category.category}
+                    className="rounded-lg border border-border bg-card overflow-hidden"
+                  >
+                    {/* Category Header */}
+                    <div className="flex items-center justify-between border-b border-border bg-secondary/30 px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <Icon className={cn("h-5 w-5", category.iconColor)} />
+                        <span className="font-semibold text-foreground">{category.category}</span>
+                      </div>
+                      <span className="text-sm text-muted-foreground">{category.sites.length}</span>
+                    </div>
+                    {/* Sites List */}
+                    <div className="divide-y divide-border">
+                      {category.sites.map((site) => (
+                        <div key={site.name} className="px-4 py-3 hover:bg-secondary/30 transition-colors">
+                          <p className="font-medium text-foreground">{site.name}</p>
+                          <p className="text-sm text-muted-foreground">{site.description}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
             </div>
+          </div>
+
+          {/* Avaliações CTA */}
+          <div className="mt-8 rounded-lg border border-border bg-card p-6 text-center">
+            <h3 className="text-lg font-semibold text-foreground">Aprovou? Envie suas avaliações!</h3>
+            <p className="mt-2 flex items-center justify-center gap-2 text-sm text-muted-foreground">
+              <MessageCircle className="h-4 w-4" />
+              Dúvidas? Entre em contato com nosso suporte
+            </p>
           </div>
         </div>
       </main>
