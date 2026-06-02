@@ -104,8 +104,7 @@ export default function ComprarCartoesPage() {
                 Estamos sem estoque no momento
               </h2>
               <p className="max-w-md text-sm text-muted-foreground">
-                Em breve iremos colocar novas infos. Entre no Discord ou Telegram
-                para ser avisado quando sair reposição e anúncios.
+                Em breve iremos colocar novas infos. Entre no Discord para ser avisado quando sair reposição e anúncios.
               </p>
             </div>
 
@@ -124,10 +123,7 @@ export default function ComprarCartoesPage() {
               </Button>
             </div>
 
-            {/* Footer text */}
-            <p className="text-xs uppercase tracking-widest text-muted-foreground/50">
-              Reposições serão avisadas primeiro nos grupos
-            </p>
+
           </div>
         ) : (
           <div className="grid gap-4 p-6 md:grid-cols-2 lg:grid-cols-3">

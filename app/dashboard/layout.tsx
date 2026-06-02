@@ -112,7 +112,7 @@ export default function DashboardLayout({
   )
 
   return (
-    <div className="flex min-h-screen bg-background">
+    <div className="flex min-h-screen rounded-[44px] bg-background">
       {/* Sidebar */}
       <aside className="fixed left-0 top-0 z-40 flex h-screen w-64 flex-col border-r border-border bg-card">
         {/* Logo */}
