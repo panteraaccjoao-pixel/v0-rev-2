@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import crypto from "crypto"
 
 // Admin credentials - In production, store these securely in environment variables
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "admin@revsystem.com"
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin123"
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "teste123@gmail.com"
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "teste123"
 
 export async function POST(request: NextRequest) {
   try {
