@@ -15,7 +15,10 @@ import {
   MessageSquare,
   HeadphonesIcon,
   Settings,
-  LogOut
+  LogOut,
+  Database,
+  CreditCard,
+  ChevronDown
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -31,7 +34,16 @@ const sidebarItems = [
   { name: "Gifts", href: "/paineladminseven/gifts", icon: Gift },
   { name: "Feedbacks", href: "/paineladminseven/feedbacks", icon: MessageSquare },
   { name: "Suporte", href: "/paineladminseven/suporte", icon: HeadphonesIcon },
-  { name: "Configurações", href: "/paineladminseven/configuracoes", icon: Settings },
+  { 
+    name: "Configurações", 
+    href: "/paineladminseven/configuracoes", 
+    icon: Settings,
+    subItems: [
+      { name: "Geral", href: "/paineladminseven/configuracoes" },
+      { name: "Banco de Dados", href: "/paineladminseven/configuracoes/banco-de-dados", icon: Database },
+      { name: "Gateway PIX", href: "/paineladminseven/configuracoes/gateway", icon: CreditCard },
+    ]
+  },
 ]
 
 export default function AdminLayout({
@@ -61,21 +73,55 @@ export default function AdminLayout({
             {sidebarItems.map((item) => {
               const isActive = pathname === item.href || 
                 (item.href !== "/paineladminseven" && pathname.startsWith(item.href))
+              const hasSubItems = item.subItems && item.subItems.length > 0
               
               return (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                    isActive
-                      ? "bg-accent/10 text-accent"
-                      : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                <div key={item.name}>
+                  <Link
+                    href={item.href}
+                    className={cn(
+                      "flex items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                      isActive
+                        ? "bg-accent/10 text-accent"
+                        : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <item.icon className="h-5 w-5" />
+                      {item.name}
+                    </div>
+                    {hasSubItems && (
+                      <ChevronDown className={cn(
+                        "h-4 w-4 transition-transform",
+                        isActive ? "rotate-180" : ""
+                      )} />
+                    )}
+                  </Link>
+                  
+                  {/* Sub-items */}
+                  {hasSubItems && isActive && (
+                    <div className="ml-4 mt-1 space-y-1 border-l border-border pl-4">
+                      {item.subItems.map((subItem) => {
+                        const isSubActive = pathname === subItem.href
+                        return (
+                          <Link
+                            key={subItem.name}
+                            href={subItem.href}
+                            className={cn(
+                              "flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors",
+                              isSubActive
+                                ? "text-accent"
+                                : "text-muted-foreground hover:text-foreground"
+                            )}
+                          >
+                            {subItem.icon && <subItem.icon className="h-4 w-4" />}
+                            {subItem.name}
+                          </Link>
+                        )
+                      })}
+                    </div>
                   )}
-                >
-                  <item.icon className="h-5 w-5" />
-                  {item.name}
-                </Link>
+                </div>
               )
             })}
           </nav>
