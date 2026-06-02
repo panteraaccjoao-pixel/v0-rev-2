@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { ArrowLeft, Eye, EyeOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -8,14 +9,38 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 
 export default function LoginPage() {
+  const router = useRouter()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
+  const [error, setError] = useState("")
+  const [loading, setLoading] = useState(false)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // Handle login logic here
-    console.log({ email, password })
+    setError("")
+    setLoading(true)
+
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password })
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        localStorage.setItem("user_session", JSON.stringify(data))
+        router.push("/dashboard")
+      } else {
+        setError(data.message || "Email ou senha incorretos")
+      }
+    } catch (err) {
+      setError("Erro ao fazer login. Tente novamente.")
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -45,6 +70,13 @@ export default function LoginPage() {
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Error message */}
+            {error && (
+              <div className="rounded-lg border border-red-500/50 bg-red-500/10 px-4 py-3 text-sm text-red-500">
+                {error}
+              </div>
+            )}
+
             {/* Email */}
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
@@ -90,23 +122,13 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* Security verification placeholder */}
-            <div className="flex justify-center">
-              <div className="flex items-center gap-3 rounded-md border border-border bg-secondary/50 px-4 py-3">
-                <div className="h-6 w-6 rounded border border-border bg-background" />
-                <span className="text-sm text-muted-foreground">{"I'm not a robot"}</span>
-                <div className="ml-4 flex flex-col items-center">
-                  <div className="text-xs text-muted-foreground">reCAPTCHA</div>
-                </div>
-              </div>
-            </div>
-
             {/* Submit button */}
             <Button 
               type="submit" 
               className="h-12 w-full bg-secondary text-secondary-foreground hover:bg-secondary/80"
+              disabled={loading}
             >
-              Entrar
+              {loading ? "Entrando..." : "Entrar"}
             </Button>
           </form>
 
