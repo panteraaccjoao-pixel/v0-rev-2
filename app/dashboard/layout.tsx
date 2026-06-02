@@ -26,7 +26,7 @@ import { Button } from "@/components/ui/button"
 const platformItems = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Comprar Cartões", href: "/dashboard/comprar", icon: CreditCard },
-  { name: "Recarga de Saldo", href: "/recarga", icon: Wallet },
+  { name: "Recarga de Saldo", href: "/dashboard/recarga", icon: Wallet },
   { name: "Meus Pedidos", href: "/dashboard/pedidos", icon: ShoppingBag },
 ]
 
