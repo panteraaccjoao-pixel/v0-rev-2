@@ -127,8 +127,9 @@ export default function LoginPage() {
               type="submit" 
               className="h-12 w-full bg-secondary text-secondary-foreground hover:bg-secondary/80"
               disabled={loading}
+              suppressHydrationWarning
             >
-              {loading ? "Entrando..." : "Entrar"}
+              <span suppressHydrationWarning>{loading ? "Entrando..." : "Entrar"}</span>
             </Button>
           </form>
 
