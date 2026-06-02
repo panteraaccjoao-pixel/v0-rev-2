@@ -6,8 +6,7 @@ import { useEffect, useState } from "react"
 import { 
   LayoutDashboard, 
   CreditCard, 
-  Layers, 
-  Search, 
+  Wallet, 
   ShoppingBag,
   Gift,
   Users,
@@ -27,8 +26,7 @@ import { Button } from "@/components/ui/button"
 const platformItems = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Comprar Cartões", href: "/dashboard/comprar", icon: CreditCard },
-  { name: "Cartões Mix", href: "/dashboard/mix", icon: Layers },
-  { name: "Consultadas", href: "/dashboard/consultadas", icon: Search },
+  { name: "Recarga de Saldo", href: "/dashboard/recarga", icon: Wallet },
   { name: "Meus Pedidos", href: "/dashboard/pedidos", icon: ShoppingBag },
 ]
 
