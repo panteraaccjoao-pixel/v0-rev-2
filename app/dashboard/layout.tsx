@@ -144,7 +144,7 @@ export default function DashboardLayout({
         </div>
 
         {/* Navigation */}
-        <div className="flex-1 overflow-y-auto px-3 py-4">
+        <div className="flex-1 overflow-y-auto px-3 py-4 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
           {renderNavSection("Plataforma", platformItems)}
           {renderNavSection("Recursos", resourceItems)}
           {renderNavSection("Comunidade & Trampos", communityItems)}
