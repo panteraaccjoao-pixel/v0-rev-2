@@ -20,18 +20,18 @@ import {
 import { cn } from "@/lib/utils"
 
 const sidebarItems = [
-  { name: "Dashboard", href: "/painel-rv7x9k2m", icon: LayoutDashboard },
-  { name: "Usuários", href: "/painel-rv7x9k2m/usuarios", icon: Users },
-  { name: "Recargas", href: "/painel-rv7x9k2m/recargas", icon: Wallet },
-  { name: "Estoque", href: "/painel-rv7x9k2m/estoque", icon: Package },
-  { name: "Logins", href: "/painel-rv7x9k2m/logins", icon: KeyRound },
-  { name: "Compras", href: "/painel-rv7x9k2m/compras", icon: ShoppingCart },
-  { name: "Trocas", href: "/painel-rv7x9k2m/trocas", icon: RefreshCw },
-  { name: "Cupons", href: "/painel-rv7x9k2m/cupons", icon: Ticket },
-  { name: "Gifts", href: "/painel-rv7x9k2m/gifts", icon: Gift },
-  { name: "Feedbacks", href: "/painel-rv7x9k2m/feedbacks", icon: MessageSquare },
-  { name: "Suporte", href: "/painel-rv7x9k2m/suporte", icon: HeadphonesIcon },
-  { name: "Configurações", href: "/painel-rv7x9k2m/configuracoes", icon: Settings },
+  { name: "Dashboard", href: "/paineladminseven", icon: LayoutDashboard },
+  { name: "Usuários", href: "/paineladminseven/usuarios", icon: Users },
+  { name: "Recargas", href: "/paineladminseven/recargas", icon: Wallet },
+  { name: "Estoque", href: "/paineladminseven/estoque", icon: Package },
+  { name: "Logins", href: "/paineladminseven/logins", icon: KeyRound },
+  { name: "Compras", href: "/paineladminseven/compras", icon: ShoppingCart },
+  { name: "Trocas", href: "/paineladminseven/trocas", icon: RefreshCw },
+  { name: "Cupons", href: "/paineladminseven/cupons", icon: Ticket },
+  { name: "Gifts", href: "/paineladminseven/gifts", icon: Gift },
+  { name: "Feedbacks", href: "/paineladminseven/feedbacks", icon: MessageSquare },
+  { name: "Suporte", href: "/paineladminseven/suporte", icon: HeadphonesIcon },
+  { name: "Configurações", href: "/paineladminseven/configuracoes", icon: Settings },
 ]
 
 export default function AdminLayout({
@@ -48,7 +48,7 @@ export default function AdminLayout({
         <div className="flex h-full flex-col">
           {/* Logo */}
           <div className="flex h-16 items-center border-b border-border px-6">
-            <Link href="/painel-rv7x9k2m" className="flex items-center gap-2">
+            <Link href="/paineladminseven" className="flex items-center gap-2">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-secondary text-sm font-bold">
                 R
               </div>
@@ -60,7 +60,7 @@ export default function AdminLayout({
           <nav className="flex-1 space-y-1 overflow-y-auto p-4">
             {sidebarItems.map((item) => {
               const isActive = pathname === item.href || 
-                (item.href !== "/painel-rv7x9k2m" && pathname.startsWith(item.href))
+                (item.href !== "/paineladminseven" && pathname.startsWith(item.href))
               
               return (
                 <Link
