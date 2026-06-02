@@ -2,10 +2,11 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, QrCode, Copy, Check } from "lucide-react"
+import { ArrowLeft, QrCode, Copy, Check, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import Link from "next/link"
+import Image from "next/image"
 
 const predefinedValues = [
   { value: 10, label: "R$ 10" },
@@ -16,13 +17,23 @@ const predefinedValues = [
   { value: 500, label: "R$ 500" },
 ]
 
+interface PixResponse {
+  success: boolean
+  pixCode: string
+  qrCodeBase64?: string
+  expiresAt?: string
+  txId?: string
+  error?: string
+}
+
 export default function RecarregarPage() {
   const router = useRouter()
   const [rechargeValue, setRechargeValue] = useState<number>(0)
   const [customValue, setCustomValue] = useState("")
-  const [pixCode, setPixCode] = useState<string | null>(null)
+  const [pixData, setPixData] = useState<PixResponse | null>(null)
   const [copied, setCopied] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [currentBalance] = useState(0)
 
   const handleValueSelect = (value: number) => {
@@ -36,7 +47,8 @@ export default function RecarregarPage() {
     const value = e.target.value.replace(/\D/g, "")
     setCustomValue(value)
     setRechargeValue(0)
-    setPixCode(null)
+    setPixData(null)
+    setError(null)
   }
 
   const getFinalValue = () => {
@@ -48,7 +60,8 @@ export default function RecarregarPage() {
   const handleClearValue = () => {
     setRechargeValue(0)
     setCustomValue("")
-    setPixCode(null)
+    setPixData(null)
+    setError(null)
   }
 
   const handleGeneratePix = async () => {
@@ -56,21 +69,41 @@ export default function RecarregarPage() {
     if (value < 5) return
 
     setLoading(true)
+    setError(null)
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 1500))
-      const mockPixCode = `00020126580014br.gov.bcb.pix0136${Date.now()}520400005303986540${value.toFixed(2)}5802BR5913REV SYSTEM6008SAOPAULO62070503***6304`
-      setPixCode(mockPixCode)
+      // Get user data from session
+      const userSession = localStorage.getItem("user_session")
+      const userData = userSession ? JSON.parse(userSession) : {}
+
+      const response = await fetch("/api/pix/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount: value,
+          userId: userData.userId,
+          userEmail: userData.email,
+        }),
+      })
+
+      const data: PixResponse = await response.json()
+
+      if (data.success && data.pixCode) {
+        setPixData(data)
+      } else {
+        setError(data.error || "Erro ao gerar PIX. Tente novamente.")
+      }
     } catch (err) {
       console.error("Erro ao gerar PIX:", err)
+      setError("Erro de conexão. Tente novamente.")
     } finally {
       setLoading(false)
     }
   }
 
   const handleCopyPix = () => {
-    if (pixCode) {
-      navigator.clipboard.writeText(pixCode)
+    if (pixData?.pixCode) {
+      navigator.clipboard.writeText(pixData.pixCode)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     }
@@ -181,20 +214,54 @@ export default function RecarregarPage() {
         </div>
 
         {/* Generate PIX Button */}
-        {!pixCode ? (
-          <Button
-            onClick={handleGeneratePix}
-            disabled={loading || getFinalValue() < 5}
-            className="h-14 w-full bg-secondary text-secondary-foreground hover:bg-secondary/80"
-          >
-            {loading ? "Gerando código PIX..." : "Gerar código PIX"}
-          </Button>
+        {!pixData ? (
+          <>
+            {error && (
+              <div className="mb-4 rounded-lg border border-red-500/50 bg-red-500/10 px-4 py-3 text-sm text-red-500">
+                {error}
+              </div>
+            )}
+            <Button
+              onClick={handleGeneratePix}
+              disabled={loading || getFinalValue() < 5}
+              className="h-14 w-full bg-secondary text-secondary-foreground hover:bg-secondary/80"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  Gerando código PIX...
+                </>
+              ) : (
+                "Gerar código PIX"
+              )}
+            </Button>
+          </>
         ) : (
           <div className="space-y-4">
+            {/* QR Code Display */}
+            {pixData.qrCodeBase64 && (
+              <div className="flex justify-center rounded-lg bg-white p-6">
+                <Image
+                  src={pixData.qrCodeBase64.startsWith("data:") 
+                    ? pixData.qrCodeBase64 
+                    : `data:image/png;base64,${pixData.qrCodeBase64}`
+                  }
+                  alt="QR Code PIX"
+                  width={200}
+                  height={200}
+                  className="h-48 w-48"
+                />
+              </div>
+            )}
+
             {/* PIX Code Display */}
             <div className="rounded-lg bg-card p-4">
-              <p className="mb-2 text-sm text-muted-foreground">Código PIX copia e cola:</p>
-              <p className="break-all rounded bg-secondary/50 p-3 text-sm text-muted-foreground">{pixCode}</p>
+              <p className="mb-2 text-sm font-medium text-muted-foreground">PIX Copia e Cola:</p>
+              <div className="relative">
+                <p className="break-all rounded bg-secondary/50 p-3 pr-12 text-xs text-muted-foreground font-mono">
+                  {pixData.pixCode}
+                </p>
+              </div>
             </div>
 
             {/* Copy Button */}
@@ -223,7 +290,30 @@ export default function RecarregarPage() {
                   R$ {getFinalValue().toFixed(2).replace(".", ",")}
                 </span>
               </div>
+              {pixData.expiresAt && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Expira em: {new Date(pixData.expiresAt).toLocaleTimeString("pt-BR")}
+                </p>
+              )}
+              {pixData.txId && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  ID: {pixData.txId}
+                </p>
+              )}
             </div>
+
+            {/* Generate New PIX */}
+            <Button
+              variant="outline"
+              onClick={() => {
+                setPixData(null)
+                setRechargeValue(0)
+                setCustomValue("")
+              }}
+              className="w-full"
+            >
+              Gerar novo PIX
+            </Button>
           </div>
         )}
 
