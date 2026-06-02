@@ -130,8 +130,8 @@ export default function DashboardLayout({
         {/* Tutorial Card */}
         <div className="mx-3 mt-4 rounded-lg border border-border bg-secondary/30 p-3">
           <div className="flex items-start gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-accent/20">
-              <Star className="h-4 w-4 text-accent" />
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-secondary">
+              <Star className="h-4 w-4 text-foreground" />
             </div>
             <div>
               <p className="text-sm font-semibold text-foreground">Tutorial de Como Aprovar</p>
@@ -149,20 +149,6 @@ export default function DashboardLayout({
           {renderNavSection("Recursos", resourceItems)}
           {renderNavSection("Comunidade & Trampos", communityItems)}
           {renderNavSection("Conta e Suporte", supportItems)}
-        </div>
-
-        {/* Telegram Button */}
-        <div className="border-t border-border p-3">
-          <Button 
-            variant="outline" 
-            className="w-full justify-start gap-2 border-accent/50 bg-accent/10 text-accent hover:bg-accent/20"
-            asChild
-          >
-            <a href="https://t.me/revsystem" target="_blank" rel="noopener noreferrer">
-              <div className="h-2 w-2 rounded-full bg-accent" />
-              Entrar no Telegram
-            </a>
-          </Button>
         </div>
 
         {/* User Profile */}
