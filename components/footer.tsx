@@ -49,7 +49,7 @@ export function Footer() {
             <h4 className="text-sm font-semibold text-foreground">Ajuda</h4>
             <nav className="flex flex-col gap-2">
               <Link 
-                href="/termos" 
+                href="/duvidas" 
                 className="text-sm text-muted-foreground transition-colors hover:text-foreground"
               >
                 Dúvidas e termos
