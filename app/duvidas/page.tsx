@@ -14,14 +14,7 @@ import {
   Home,
   Zap,
   ShieldCheck,
-  Wifi,
-  KeyRound,
   ChevronDown,
-  ShoppingCart,
-  UtensilsCrossed,
-  Heart,
-  PawPrint,
-  Smartphone,
   MessageCircle
 } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -85,66 +78,6 @@ const duvidasTecnicas: FaqItem[] = [
     question: "O que é VBV?",
     answer: "VBV (Verified by Visa) é uma etapa de segurança que confirma a identidade do comprador durante uma transação online. Cair no VBV não significa que o cartão está ruim — apenas que a loja possui essa verificação ativa."
   }
-]
-
-const sitesRecomendados = [
-  {
-    category: "E-commerce Geral",
-    icon: ShoppingCart,
-    iconColor: "text-blue-400",
-    sites: [
-      { name: "Americanas", description: "Eletrônicos, moda, casa, alimentos, brinquedos e mais" },
-      { name: "Mercado Livre", description: "Marketplace com enorme variedade de produtos" },
-      { name: "Shopee", description: "Produtos variados com preços acessíveis" },
-      { name: "AliExpress", description: "Produtos variados direto da China" },
-    ]
-  },
-  {
-    category: "Alimentação & Bebidas",
-    icon: UtensilsCrossed,
-    iconColor: "text-orange-400",
-    sites: [
-      { name: "Swift", description: "Carnes bovinas, frangos, pescados e congelados" },
-      { name: "iFood", description: "Entrega de comida rápida" },
-      { name: "Wine", description: "Vinhos, espumantes e clube de assinatura" },
-    ]
-  },
-  {
-    category: "Farmácias & Saúde",
-    icon: Heart,
-    iconColor: "text-red-400",
-    sites: [
-      { name: "Pague Menos", description: "Medicamentos, dermocosméticos e nutrição" },
-      { name: "Droga Raia", description: "Farmácia online com ampla variedade" },
-      { name: "Drogaria São Paulo", description: "Medicamentos, higiene e retirada rápida" },
-      { name: "Drogasil", description: "Medicamentos, vacinas, suplementos e beleza" },
-    ]
-  },
-  {
-    category: "Pets & Casa",
-    icon: PawPrint,
-    iconColor: "text-amber-400",
-    sites: [
-      { name: "Cobasi", description: "Rações, acessórios pet, casa, jardim e piscina" },
-    ]
-  },
-  {
-    category: "Beleza & Cuidados",
-    icon: Sparkles,
-    iconColor: "text-pink-400",
-    sites: [
-      { name: "GlamBox", description: "Caixas de beleza por assinatura" },
-    ]
-  },
-  {
-    category: "Tecnologia & Eletrônicos",
-    icon: Smartphone,
-    iconColor: "text-cyan-400",
-    sites: [
-      { name: "Samsung", description: "Smartphones, tablets, TVs e eletrodomésticos" },
-      { name: "Kabum", description: "Periféricos, eletrônicos e componentes" },
-    ]
-  },
 ]
 
 function AccordionItem({ item, isOpen, onToggle }: { item: FaqItem; isOpen: boolean; onToggle: () => void }) {
@@ -251,112 +184,7 @@ export default function DuvidasPage() {
                     onToggle={() => toggleItem(`tecnica-${index}`)}
                   />
                 ))}
-
-                {/* Onde Aprovar Card */}
-                <div className="rounded-lg border border-border bg-card p-4">
-                  <div className="mb-3 flex items-center gap-2">
-                    <Globe className="h-5 w-5 text-green-500" />
-                    <span className="font-medium text-foreground">Onde Aprovar</span>
-                  </div>
-                  <p className="mb-4 text-sm leading-relaxed text-muted-foreground">
-                    Sites menores geralmente têm mais chance de aprovação, pois sites grandes possuem segurança reforçada. Para sites grandes, é necessário{" "}
-                    <span className="text-green-500">IP limpo</span> e{" "}
-                    <span className="text-orange-500">login bom</span>.
-                  </p>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="flex items-center gap-3 rounded-lg border border-border bg-secondary/50 p-3">
-                      <Wifi className="h-5 w-5 text-cyan-400" />
-                      <span className="text-sm text-muted-foreground">Usar 4G se possível</span>
-                    </div>
-                    <div className="flex items-center gap-3 rounded-lg border border-border bg-secondary/50 p-3">
-                      <KeyRound className="h-5 w-5 text-yellow-400" />
-                      <span className="text-sm text-muted-foreground">Login com pedidos antigos</span>
-                    </div>
-                  </div>
-                </div>
               </div>
-            </div>
-          </div>
-
-          {/* Banner */}
-          <div className="mt-8 rounded-lg bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-500/30 p-4">
-            <p className="text-center text-sm md:text-base">
-              <span className="text-green-400">Todo nosso material é </span>
-              <span className="font-bold text-green-400">VIRGEM</span>
-              <span className="text-green-400">. Fuja de material de baixa qualidade — venha com o melhor!</span>
-            </p>
-          </div>
-
-          {/* Sites Recomendados */}
-          <div className="mt-8">
-            <div className="mb-4 flex items-center justify-between">
-              <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                <CheckCircle className="h-4 w-4" />
-                Sites Recomendados
-              </div>
-              <span className="text-sm text-muted-foreground">escolhidos a dedo</span>
-            </div>
-            
-            {/* First Row - 4 columns */}
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              {sitesRecomendados.slice(0, 4).map((category) => {
-                const Icon = category.icon
-                return (
-                  <div
-                    key={category.category}
-                    className="rounded-lg border border-border bg-card p-4"
-                  >
-                    {/* Category Header */}
-                    <div className="mb-3 flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Icon className={cn("h-5 w-5", category.iconColor)} />
-                        <span className="font-semibold text-foreground">{category.category}</span>
-                      </div>
-                      <span className="text-sm text-muted-foreground">{category.sites.length}</span>
-                    </div>
-                    {/* Sites List */}
-                    <div className="space-y-2">
-                      {category.sites.map((site) => (
-                        <div key={site.name} className="rounded-lg bg-secondary/50 px-4 py-3">
-                          <p className="font-medium text-foreground">{site.name}</p>
-                          <p className="text-sm text-muted-foreground">{site.description}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-
-            {/* Second Row - 2 columns */}
-            <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              {sitesRecomendados.slice(4).map((category) => {
-                const Icon = category.icon
-                return (
-                  <div
-                    key={category.category}
-                    className="rounded-lg border border-border bg-card p-4"
-                  >
-                    {/* Category Header */}
-                    <div className="mb-3 flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Icon className={cn("h-5 w-5", category.iconColor)} />
-                        <span className="font-semibold text-foreground">{category.category}</span>
-                      </div>
-                      <span className="text-sm text-muted-foreground">{category.sites.length}</span>
-                    </div>
-                    {/* Sites List */}
-                    <div className="space-y-2">
-                      {category.sites.map((site) => (
-                        <div key={site.name} className="rounded-lg bg-secondary/50 px-4 py-3">
-                          <p className="font-medium text-foreground">{site.name}</p>
-                          <p className="text-sm text-muted-foreground">{site.description}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )
-              })}
             </div>
           </div>
 
