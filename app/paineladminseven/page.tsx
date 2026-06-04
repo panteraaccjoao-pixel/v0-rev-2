@@ -11,7 +11,10 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   RefreshCw,
-  RotateCcw
+  RotateCcw,
+  Users,
+  Package,
+  AlertCircle
 } from "lucide-react"
 import {
   LineChart,
@@ -28,6 +31,9 @@ interface Stats {
   saques: number
   vendas: number
   ticketMedio: number
+  usuariosCadastrados: number
+  recargasPendentes: number
+  estoqueTotal: number
   dailyData: { date: string; faturamento: number; vendas: number }[]
   recentSales: { id: string; user: string; product: string; value: number; date: string }[]
   lastUpdated: string
@@ -39,6 +45,9 @@ export default function AdminDashboard() {
     saques: 0,
     vendas: 0,
     ticketMedio: 0,
+    usuariosCadastrados: 0,
+    recargasPendentes: 0,
+    estoqueTotal: 0,
     dailyData: [],
     recentSales: [],
     lastUpdated: new Date().toISOString()

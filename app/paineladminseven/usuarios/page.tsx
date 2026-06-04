@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -9,8 +9,13 @@ import {
   Search, 
   MoreHorizontal, 
   Eye,
-  Edit,
   Ban,
+  CheckCircle,
+  Trash2,
+  Users,
+  UserCheck,
+  UserX,
+  RefreshCw,
   DollarSign,
   ShoppingCart
 } from "lucide-react"
@@ -27,28 +32,121 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 
-// Dados de exemplo
-const users = [
-  { id: 1, name: "João Silva", email: "joao@email.com", balance: 150.00, purchases: 12, status: "ativo", createdAt: "01/01/2024" },
-  { id: 2, name: "Maria Santos", email: "maria@email.com", balance: 85.50, purchases: 8, status: "ativo", createdAt: "05/01/2024" },
-  { id: 3, name: "Pedro Costa", email: "pedro@email.com", balance: 0, purchases: 3, status: "banido", createdAt: "10/01/2024" },
-  { id: 4, name: "Ana Oliveira", email: "ana@email.com", balance: 320.00, purchases: 25, status: "ativo", createdAt: "12/01/2024" },
-  { id: 5, name: "Lucas Pereira", email: "lucas@email.com", balance: 45.00, purchases: 5, status: "ativo", createdAt: "15/01/2024" },
-]
-
-const recentPurchases = [
-  { id: 1, product: "CC Platinum Santander", value: 45.00, date: "14/01/2024 15:30" },
-  { id: 2, product: "CC Gold Itaú", value: 35.00, date: "14/01/2024 14:20" },
-  { id: 3, product: "CC Black Nubank", value: 80.00, date: "13/01/2024 18:45" },
-]
+interface User {
+  id: string
+  name: string
+  email: string
+  createdAt: string
+  balance: number
+  totalSpent: number
+  purchases: number
+  status: "active" | "blocked"
+}
 
 export default function UsuariosPage() {
   const [search, setSearch] = useState("")
-  const [selectedUser, setSelectedUser] = useState<typeof users[0] | null>(null)
+  const [users, setUsers] = useState<User[]>([])
+  const [totalUsers, setTotalUsers] = useState(0)
+  const [activeCount, setActiveCount] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [selectedUser, setSelectedUser] = useState<User | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isEditBalanceOpen, setIsEditBalanceOpen] = useState(false)
   const [newBalance, setNewBalance] = useState("")
+  const [updating, setUpdating] = useState(false)
+
+  const fetchUsers = useCallback(async () => {
+    try {
+      const res = await fetch("/api/users")
+      if (res.ok) {
+        const data = await res.json()
+        setUsers(data.users || [])
+        setTotalUsers(data.total || 0)
+        setActiveCount(data.activeCount || 0)
+      }
+    } catch (error) {
+      console.error("Error fetching users:", error)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchUsers()
+    
+    // Poll for updates every 3 seconds
+    const interval = setInterval(fetchUsers, 3000)
+    return () => clearInterval(interval)
+  }, [fetchUsers])
+
+  const handleBlockUser = async (userId: string) => {
+    try {
+      const res = await fetch("/api/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "block", userId })
+      })
+      if (res.ok) fetchUsers()
+    } catch (error) {
+      console.error("Error blocking user:", error)
+    }
+  }
+
+  const handleUnblockUser = async (userId: string) => {
+    try {
+      const res = await fetch("/api/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "unblock", userId })
+      })
+      if (res.ok) fetchUsers()
+    } catch (error) {
+      console.error("Error unblocking user:", error)
+    }
+  }
+
+  const handleDeleteUser = async (userId: string) => {
+    try {
+      const res = await fetch(`/api/users?id=${userId}`, { method: "DELETE" })
+      if (res.ok) fetchUsers()
+    } catch (error) {
+      console.error("Error deleting user:", error)
+    }
+  }
+
+  const handleUpdateBalance = async () => {
+    if (!selectedUser) return
+    setUpdating(true)
+    try {
+      const newAmount = parseFloat(newBalance) - selectedUser.balance
+      const res = await fetch("/api/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          action: "update_balance", 
+          userId: selectedUser.id,
+          amount: newAmount
+        })
+      })
+      if (res.ok) {
+        fetchUsers()
+        setIsEditBalanceOpen(false)
+      }
+    } catch (error) {
+      console.error("Error updating balance:", error)
+    } finally {
+      setUpdating(false)
+    }
+  }
 
   const filteredUsers = users.filter(
     (user) =>
@@ -56,25 +154,69 @@ export default function UsuariosPage() {
       user.email.toLowerCase().includes(search.toLowerCase())
   )
 
-  const handleViewUser = (user: typeof users[0]) => {
-    setSelectedUser(user)
-    setIsDialogOpen(true)
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL"
+    }).format(value)
   }
 
-  const handleEditBalance = (user: typeof users[0]) => {
-    setSelectedUser(user)
-    setNewBalance(user.balance.toString())
-    setIsEditBalanceOpen(true)
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("pt-BR")
   }
 
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Usuários</h1>
-        <p className="text-muted-foreground">
-          Gerencie os usuários cadastrados na plataforma
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Usuários</h1>
+          <p className="text-muted-foreground">
+            Gerencie os usuários cadastrados na plataforma
+          </p>
+        </div>
+        <Button variant="outline" size="sm" onClick={fetchUsers}>
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Atualizar
+        </Button>
+      </div>
+
+      {/* Stats */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card className="bg-card border-border">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Total de Usuários
+              <span className="flex h-2 w-2 animate-pulse rounded-full bg-green-500 ml-auto" />
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalUsers}</div>
+          </CardContent>
+        </Card>
+        <Card className="bg-card border-border">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <UserCheck className="h-4 w-4 text-green-500" />
+              Usuários Ativos
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-500">{activeCount}</div>
+          </CardContent>
+        </Card>
+        <Card className="bg-card border-border">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <UserX className="h-4 w-4 text-red-500" />
+              Usuários Bloqueados
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-500">{totalUsers - activeCount}</div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Search */}
@@ -91,75 +233,120 @@ export default function UsuariosPage() {
       </div>
 
       {/* Users Table */}
-      <Card className="bg-card border-border">
-        <CardHeader>
-          <CardTitle>Usuários Cadastrados ({filteredUsers.length})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="pb-3 text-left text-sm font-medium text-muted-foreground">Nome</th>
-                  <th className="pb-3 text-left text-sm font-medium text-muted-foreground">Email</th>
-                  <th className="pb-3 text-left text-sm font-medium text-muted-foreground">Saldo</th>
-                  <th className="pb-3 text-left text-sm font-medium text-muted-foreground">Compras</th>
-                  <th className="pb-3 text-left text-sm font-medium text-muted-foreground">Status</th>
-                  <th className="pb-3 text-left text-sm font-medium text-muted-foreground">Cadastro</th>
-                  <th className="pb-3 text-right text-sm font-medium text-muted-foreground">Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredUsers.map((user) => (
-                  <tr key={user.id} className="border-b border-border last:border-0">
-                    <td className="py-4 text-sm font-medium">{user.name}</td>
-                    <td className="py-4 text-sm text-muted-foreground">{user.email}</td>
-                    <td className="py-4 text-sm font-medium text-accent">
-                      R$ {user.balance.toFixed(2)}
-                    </td>
-                    <td className="py-4 text-sm">{user.purchases}</td>
-                    <td className="py-4">
-                      <span
-                        className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-                          user.status === "ativo"
-                            ? "bg-green-500/10 text-green-500"
-                            : "bg-red-500/10 text-red-500"
-                        }`}
-                      >
-                        {user.status}
-                      </span>
-                    </td>
-                    <td className="py-4 text-sm text-muted-foreground">{user.createdAt}</td>
-                    <td className="py-4 text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="bg-card border-border">
-                          <DropdownMenuItem onClick={() => handleViewUser(user)}>
-                            <Eye className="mr-2 h-4 w-4" />
-                            Ver detalhes
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleEditBalance(user)}>
-                            <DollarSign className="mr-2 h-4 w-4" />
-                            Alterar saldo
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="text-red-500">
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+        </div>
+      ) : filteredUsers.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <Users className="h-12 w-12 text-muted-foreground/50 mb-4" />
+          <h3 className="text-lg font-semibold">Nenhum usuário cadastrado</h3>
+          <p className="text-sm text-muted-foreground">Os usuários aparecem aqui em tempo real quando se cadastram</p>
+        </div>
+      ) : (
+        <div className="rounded-lg border border-border bg-card">
+          <Table>
+            <TableHeader>
+              <TableRow className="border-border">
+                <TableHead>Usuário</TableHead>
+                <TableHead>Saldo</TableHead>
+                <TableHead>Total Gasto</TableHead>
+                <TableHead>Compras</TableHead>
+                <TableHead>Cadastro</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredUsers.map((user) => (
+                <TableRow key={user.id} className="border-border">
+                  <TableCell>
+                    <div>
+                      <p className="font-medium">{user.name}</p>
+                      <p className="text-sm text-muted-foreground">{user.email}</p>
+                    </div>
+                  </TableCell>
+                  <TableCell className="font-medium text-accent">
+                    {formatCurrency(user.balance)}
+                  </TableCell>
+                  <TableCell>{formatCurrency(user.totalSpent)}</TableCell>
+                  <TableCell>{user.purchases}</TableCell>
+                  <TableCell>{formatDate(user.createdAt)}</TableCell>
+                  <TableCell>
+                    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium ${
+                      user.status === "active" 
+                        ? "bg-green-500/20 text-green-500" 
+                        : "bg-red-500/20 text-red-500"
+                    }`}>
+                      {user.status === "active" ? (
+                        <>
+                          <CheckCircle className="h-3 w-3" />
+                          Ativo
+                        </>
+                      ) : (
+                        <>
+                          <Ban className="h-3 w-3" />
+                          Bloqueado
+                        </>
+                      )}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="bg-card border-border">
+                        <DropdownMenuItem onClick={() => {
+                          setSelectedUser(user)
+                          setIsDialogOpen(true)
+                        }}>
+                          <Eye className="mr-2 h-4 w-4" />
+                          Ver detalhes
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => {
+                          setSelectedUser(user)
+                          setNewBalance(user.balance.toString())
+                          setIsEditBalanceOpen(true)
+                        }}>
+                          <DollarSign className="mr-2 h-4 w-4" />
+                          Alterar saldo
+                        </DropdownMenuItem>
+                        {user.status === "active" ? (
+                          <DropdownMenuItem 
+                            className="text-yellow-500"
+                            onClick={() => handleBlockUser(user.id)}
+                          >
                             <Ban className="mr-2 h-4 w-4" />
-                            {user.status === "ativo" ? "Banir usuário" : "Desbanir"}
+                            Bloquear
                           </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+                        ) : (
+                          <DropdownMenuItem 
+                            className="text-green-500"
+                            onClick={() => handleUnblockUser(user.id)}
+                          >
+                            <CheckCircle className="mr-2 h-4 w-4" />
+                            Desbloquear
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuItem 
+                          className="text-red-500"
+                          onClick={() => handleDeleteUser(user.id)}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Excluir
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
 
       {/* View User Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -183,34 +370,19 @@ export default function UsuariosPage() {
                 </div>
                 <div>
                   <Label className="text-muted-foreground">Saldo</Label>
-                  <p className="font-medium text-accent">R$ {selectedUser.balance.toFixed(2)}</p>
+                  <p className="font-medium text-accent">{formatCurrency(selectedUser.balance)}</p>
+                </div>
+                <div>
+                  <Label className="text-muted-foreground">Total Gasto</Label>
+                  <p className="font-medium">{formatCurrency(selectedUser.totalSpent)}</p>
                 </div>
                 <div>
                   <Label className="text-muted-foreground">Total de Compras</Label>
                   <p className="font-medium">{selectedUser.purchases}</p>
                 </div>
-              </div>
-
-              <div>
-                <h4 className="font-medium mb-3">Compras Recentes</h4>
-                <div className="space-y-2">
-                  {recentPurchases.map((purchase) => (
-                    <div
-                      key={purchase.id}
-                      className="flex items-center justify-between rounded-lg bg-secondary p-3"
-                    >
-                      <div className="flex items-center gap-3">
-                        <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-                        <div>
-                          <p className="text-sm font-medium">{purchase.product}</p>
-                          <p className="text-xs text-muted-foreground">{purchase.date}</p>
-                        </div>
-                      </div>
-                      <p className="text-sm font-medium text-accent">
-                        R$ {purchase.value.toFixed(2)}
-                      </p>
-                    </div>
-                  ))}
+                <div>
+                  <Label className="text-muted-foreground">Data de Cadastro</Label>
+                  <p className="font-medium">{formatDate(selectedUser.createdAt)}</p>
                 </div>
               </div>
             </div>
@@ -243,8 +415,8 @@ export default function UsuariosPage() {
                 />
               </div>
             </div>
-            <Button className="w-full" onClick={() => setIsEditBalanceOpen(false)}>
-              Salvar alterações
+            <Button className="w-full" onClick={handleUpdateBalance} disabled={updating}>
+              {updating ? "Salvando..." : "Salvar alterações"}
             </Button>
           </div>
         </DialogContent>

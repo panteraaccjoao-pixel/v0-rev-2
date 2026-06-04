@@ -7,6 +7,9 @@ let statsData = {
   saques: 0,
   vendas: 0,
   ticketMedio: 0,
+  usuariosCadastrados: 0,
+  recargasPendentes: 0,
+  estoqueTotal: 0,
   dailyData: [] as { date: string; faturamento: number; vendas: number }[],
   recentSales: [] as { id: string; user: string; product: string; value: number; date: string }[],
   lastUpdated: new Date().toISOString()
@@ -22,6 +25,32 @@ export async function GET() {
       // Here you would connect to the user's database and fetch real data
       // const config = JSON.parse(dbConfig)
       // const data = await fetchFromDatabase(config)
+    }
+
+    // Fetch real-time data from other APIs
+    try {
+      const [usersRes, rechargesRes, estoqueRes] = await Promise.all([
+        fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/users`),
+        fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/recargas`),
+        fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/estoque`)
+      ])
+
+      if (usersRes.ok) {
+        const usersData = await usersRes.json()
+        statsData.usuariosCadastrados = usersData.total || 0
+      }
+
+      if (rechargesRes.ok) {
+        const rechargesData = await rechargesRes.json()
+        statsData.recargasPendentes = rechargesData.pendingCount || 0
+      }
+
+      if (estoqueRes.ok) {
+        const estoqueData = await estoqueRes.json()
+        statsData.estoqueTotal = estoqueData.total || 0
+      }
+    } catch (e) {
+      // Ignore fetch errors for real-time data
     }
     
     // Calculate ticket medio
@@ -77,6 +106,9 @@ export async function POST(request: Request) {
           saques: 0,
           vendas: 0,
           ticketMedio: 0,
+          usuariosCadastrados: 0,
+          recargasPendentes: 0,
+          estoqueTotal: 0,
           dailyData: [],
           recentSales: [],
           lastUpdated: new Date().toISOString()
