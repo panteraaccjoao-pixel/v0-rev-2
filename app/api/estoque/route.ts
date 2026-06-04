@@ -139,6 +139,32 @@ export async function PATCH(request: NextRequest) {
       // Remove from available products (mark as sold)
       products.splice(productIndex, 1)
 
+      // Create order record
+      try {
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+        await fetch(`${baseUrl}/api/pedidos`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: userId || "user_teste_001",
+            userName: userName || "Cliente",
+            product: `${product.level} ${product.brand}`,
+            level: product.level,
+            brand: product.brand,
+            total: product.price,
+            cardData: {
+              fullCard: product.fullCard,
+              cvv: product.cvv,
+              expiry: product.expiry,
+              bin: product.bin,
+              bank: product.bank
+            }
+          })
+        })
+      } catch (e) {
+        console.error("Error creating order:", e)
+      }
+
       // Return full card details after purchase
       return NextResponse.json({ 
         success: true, 
