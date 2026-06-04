@@ -186,20 +186,20 @@ export default function AdminDashboard() {
         <Card className="bg-card border-border">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total de Saques
+              Total de Vendas
             </CardTitle>
-            <Wallet className="h-4 w-4 text-accent" />
+            <ShoppingCart className="h-4 w-4 text-accent" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(stats.saques)}</div>
+            <div className="text-2xl font-bold">{stats.vendas}</div>
             <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-              {stats.saques > 0 ? (
+              {stats.vendas > 0 ? (
                 <>
-                  <ArrowDownRight className="h-3 w-3 text-red-500" />
-                  <span className="text-red-500">Saques realizados</span>
+                  <ArrowUpRight className="h-3 w-3 text-green-500" />
+                  <span className="text-green-500">Vendas confirmadas</span>
                 </>
               ) : (
-                <span>Nenhum saque ainda</span>
+                <span>Aguardando vendas</span>
               )}
             </p>
           </CardContent>
@@ -227,21 +227,74 @@ export default function AdminDashboard() {
         <Card className="bg-card border-border">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total de Vendas
+              Total de Saques
             </CardTitle>
-            <ShoppingCart className="h-4 w-4 text-accent" />
+            <Wallet className="h-4 w-4 text-accent" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.vendas}</div>
+            <div className="text-2xl font-bold">{formatCurrency(stats.saques)}</div>
             <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-              {stats.vendas > 0 ? (
+              {stats.saques > 0 ? (
                 <>
-                  <ArrowUpRight className="h-3 w-3 text-green-500" />
-                  <span className="text-green-500">Vendas confirmadas</span>
+                  <ArrowDownRight className="h-3 w-3 text-red-500" />
+                  <span className="text-red-500">Saques realizados</span>
                 </>
               ) : (
-                <span>Aguardando vendas</span>
+                <span>Nenhum saque ainda</span>
               )}
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Secondary Stats */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card className="bg-card border-border">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              Usuários Cadastrados
+              <span className="flex h-2 w-2 animate-pulse rounded-full bg-green-500" />
+            </CardTitle>
+            <Users className="h-4 w-4 text-blue-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.usuariosCadastrados}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Atualizado em tempo real
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-card border-border">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              Recargas Pendentes
+              {stats.recargasPendentes > 0 && (
+                <span className="flex h-2 w-2 animate-pulse rounded-full bg-yellow-500" />
+              )}
+            </CardTitle>
+            <AlertCircle className="h-4 w-4 text-yellow-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-yellow-500">{stats.recargasPendentes}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {stats.recargasPendentes > 0 ? "Aguardando aprovação" : "Nenhuma pendência"}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-card border-border">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              Estoque Total
+              <span className="flex h-2 w-2 animate-pulse rounded-full bg-green-500" />
+            </CardTitle>
+            <Package className="h-4 w-4 text-purple-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.estoqueTotal}</div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Cartões disponíveis
             </p>
           </CardContent>
         </Card>
