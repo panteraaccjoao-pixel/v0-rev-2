@@ -64,7 +64,12 @@ export default function DashboardLayout({
     }
     try {
       const data = JSON.parse(session)
-      setUser({ name: data.user?.name || "Usuário", email: data.user?.email || "" })
+      // Handle both formats: { user: {...} } or { name, email }
+      const userData = data.user || data
+      setUser({ 
+        name: userData?.name || "Usuário", 
+        email: userData?.email || "" 
+      })
     } catch {
       router.push("/login")
     }
