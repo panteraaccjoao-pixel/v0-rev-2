@@ -35,6 +35,9 @@ interface PurchasedCard {
   level: string
   brand: string
   price: number
+  holderName?: string
+  cpf?: string
+  birthDate?: string
 }
 
 export default function ComprarCartoesPage() {
@@ -367,6 +370,31 @@ export default function ComprarCartoesPage() {
                       </span>
                     </div>
                   </div>
+
+                  {/* Holder Data */}
+                  {(purchasedCard.holderName || purchasedCard.cpf || purchasedCard.birthDate) && (
+                    <div className="rounded-lg bg-secondary/50 p-4 space-y-3">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Dados do Titular</p>
+                      {purchasedCard.holderName && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Nome</span>
+                          <span className="font-medium">{purchasedCard.holderName}</span>
+                        </div>
+                      )}
+                      {purchasedCard.cpf && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">CPF</span>
+                          <span className="font-mono font-medium">{purchasedCard.cpf}</span>
+                        </div>
+                      )}
+                      {purchasedCard.birthDate && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Nascimento</span>
+                          <span className="font-mono font-medium">{purchasedCard.birthDate}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   <p className="text-xs text-center text-muted-foreground">
                     Guarde essas informações em local seguro. O cartão foi adicionado aos seus pedidos.

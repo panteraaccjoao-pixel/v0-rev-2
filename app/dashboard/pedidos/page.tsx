@@ -36,6 +36,9 @@ interface Order {
     expiry: string
     bin: string
     bank: string
+    holderName?: string
+    cpf?: string
+    birthDate?: string
   }
 }
 
@@ -351,6 +354,63 @@ export default function PedidosPage() {
                       <span className="font-mono font-medium">{selectedOrder.cardData.bin}</span>
                     </div>
                   </div>
+
+                  {/* Holder Data */}
+                  {(selectedOrder.cardData.holderName || selectedOrder.cardData.cpf || selectedOrder.cardData.birthDate) && (
+                    <div className="mt-4">
+                      <h4 className="text-sm font-medium text-muted-foreground mb-3">Dados do Titular</h4>
+                      <div className="rounded-lg bg-secondary/30 p-4 space-y-3">
+                        {selectedOrder.cardData.holderName && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-muted-foreground">Nome</span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">{selectedOrder.cardData.holderName}</span>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6"
+                                onClick={() => copyToClipboard(selectedOrder.cardData!.holderName!, "holderName")}
+                              >
+                                {copied === "holderName" ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                        {selectedOrder.cardData.cpf && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-muted-foreground">CPF</span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-medium">{selectedOrder.cardData.cpf}</span>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6"
+                                onClick={() => copyToClipboard(selectedOrder.cardData!.cpf!, "cpf")}
+                              >
+                                {copied === "cpf" ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                        {selectedOrder.cardData.birthDate && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-muted-foreground">Nascimento</span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-medium">{selectedOrder.cardData.birthDate}</span>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6"
+                                onClick={() => copyToClipboard(selectedOrder.cardData!.birthDate!, "birthDate")}
+                              >
+                                {copied === "birthDate" ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3" />}
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 

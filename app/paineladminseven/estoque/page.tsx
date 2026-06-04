@@ -48,6 +48,9 @@ interface Product {
   price: number
   brand: string
   createdAt: string
+  holderName: string
+  cpf: string
+  birthDate: string
 }
 
 interface ProductGroup {
@@ -98,7 +101,10 @@ export default function EstoquePage() {
     fullCard: "",
     expiry: "",
     cvv: "",
-    brand: "mastercard"
+    brand: "mastercard",
+    holderName: "",
+    cpf: "",
+    birthDate: ""
   })
 
   const fetchProducts = useCallback(async () => {
@@ -145,7 +151,10 @@ export default function EstoquePage() {
           fullCard: "",
           expiry: "",
           cvv: "",
-          brand: "mastercard"
+          brand: "mastercard",
+          holderName: "",
+          cpf: "",
+          birthDate: ""
         })
         fetchProducts()
       }
@@ -319,6 +328,46 @@ export default function EstoquePage() {
                     className="bg-secondary border-border"
                   />
                 </div>
+
+                {/* Separator */}
+                <div className="border-t border-border pt-4">
+                  <p className="text-sm font-medium text-muted-foreground mb-4">Dados do Titular (Opcional)</p>
+                  <div className="grid gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="holderName">Nome do Titular</Label>
+                      <Input
+                        id="holderName"
+                        placeholder="João da Silva"
+                        value={newProduct.holderName}
+                        onChange={(e) => setNewProduct({ ...newProduct, holderName: e.target.value })}
+                        className="bg-secondary border-border"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="cpf">CPF</Label>
+                        <Input
+                          id="cpf"
+                          placeholder="000.000.000-00"
+                          value={newProduct.cpf}
+                          onChange={(e) => setNewProduct({ ...newProduct, cpf: e.target.value })}
+                          className="bg-secondary border-border"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="birthDate">Data de Nascimento</Label>
+                        <Input
+                          id="birthDate"
+                          placeholder="DD/MM/AAAA"
+                          value={newProduct.birthDate}
+                          onChange={(e) => setNewProduct({ ...newProduct, birthDate: e.target.value })}
+                          className="bg-secondary border-border"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 <Button className="w-full" onClick={handleAddProduct} disabled={adding}>
                   {adding ? "Adicionando..." : "Adicionar ao Estoque"}
                 </Button>

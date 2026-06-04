@@ -15,6 +15,10 @@ interface Product {
   price: number
   brand: string
   createdAt: string
+  // Additional info
+  holderName: string
+  cpf: string
+  birthDate: string
 }
 
 // GET - List all products
@@ -83,7 +87,10 @@ export async function POST(request: NextRequest) {
       level: data.level || "Standard",
       price: parseFloat(data.price) || 0,
       brand: data.brand || "visa",
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      holderName: data.holderName || "",
+      cpf: data.cpf || "",
+      birthDate: data.birthDate || ""
     }
 
     products.push(newProduct)
@@ -157,7 +164,10 @@ export async function PATCH(request: NextRequest) {
               cvv: product.cvv,
               expiry: product.expiry,
               bin: product.bin,
-              bank: product.bank
+              bank: product.bank,
+              holderName: product.holderName,
+              cpf: product.cpf,
+              birthDate: product.birthDate
             }
           })
         })
@@ -177,7 +187,10 @@ export async function PATCH(request: NextRequest) {
           bank: product.bank,
           level: product.level,
           brand: product.brand,
-          price: product.price
+          price: product.price,
+          holderName: product.holderName,
+          cpf: product.cpf,
+          birthDate: product.birthDate
         },
         message: "Compra realizada com sucesso!"
       })

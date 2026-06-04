@@ -21,6 +21,9 @@ export interface Order {
     expiry: string
     bin: string
     bank: string
+    holderName?: string
+    cpf?: string
+    birthDate?: string
   }
 }
 
