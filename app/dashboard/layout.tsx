@@ -10,7 +10,6 @@ import {
   ShoppingBag,
   Gift,
   Star,
-  MessageSquare,
   Ticket,
   Settings,
   HelpCircle,
@@ -35,7 +34,6 @@ const resourceItems = [
 ]
 
 const communityItems = [
-  { name: "Grupos", href: "/dashboard/grupos", icon: MessageSquare },
   { name: "Tickets", href: "/dashboard/tickets", icon: Ticket },
 ]
 
