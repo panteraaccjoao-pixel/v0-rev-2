@@ -1,11 +1,104 @@
 "use client"
 
-import { User, Shield, Palette, LogOut } from "lucide-react"
+import { useState, useEffect } from "react"
+import { User, Shield, Palette, LogOut, MessageCircle, Check, X, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 
+interface DiscordData {
+  linked: boolean
+  discordId?: string
+  discordUsername?: string
+  linkedAt?: string
+}
+
 export default function ConfiguracoesPage() {
+  const [discordData, setDiscordData] = useState<DiscordData>({ linked: false })
+  const [discordUsername, setDiscordUsername] = useState("")
+  const [isLinkingDiscord, setIsLinkingDiscord] = useState(false)
+  const [discordError, setDiscordError] = useState("")
+  const [discordSuccess, setDiscordSuccess] = useState("")
+
+  useEffect(() => {
+    fetchDiscordStatus()
+  }, [])
+
+  const fetchDiscordStatus = async () => {
+    try {
+      const res = await fetch("/api/user/discord")
+      if (res.ok) {
+        const data = await res.json()
+        setDiscordData(data)
+      }
+    } catch (error) {
+      console.error("Error fetching discord status:", error)
+    }
+  }
+
+  const handleLinkDiscord = async () => {
+    if (!discordUsername.trim()) {
+      setDiscordError("Digite seu username do Discord")
+      return
+    }
+
+    setIsLinkingDiscord(true)
+    setDiscordError("")
+    setDiscordSuccess("")
+
+    try {
+      const res = await fetch("/api/user/discord", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ discordUsername: discordUsername.trim() })
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        setDiscordError(data.error || "Erro ao vincular Discord")
+        return
+      }
+
+      setDiscordData({
+        linked: true,
+        discordId: data.discordId,
+        discordUsername: data.discordUsername,
+        linkedAt: data.linkedAt
+      })
+      setDiscordUsername("")
+      setDiscordSuccess("Discord vinculado com sucesso!")
+      setTimeout(() => setDiscordSuccess(""), 3000)
+    } catch {
+      setDiscordError("Erro ao vincular Discord")
+    } finally {
+      setIsLinkingDiscord(false)
+    }
+  }
+
+  const handleUnlinkDiscord = async () => {
+    setIsLinkingDiscord(true)
+    setDiscordError("")
+
+    try {
+      const res = await fetch("/api/user/discord", { method: "DELETE" })
+
+      if (!res.ok) {
+        const data = await res.json()
+        setDiscordError(data.error || "Erro ao desvincular Discord")
+        return
+      }
+
+      setDiscordData({ linked: false })
+      setDiscordSuccess("Discord desvinculado com sucesso!")
+      setTimeout(() => setDiscordSuccess(""), 3000)
+    } catch {
+      setDiscordError("Erro ao desvincular Discord")
+    } finally {
+      setIsLinkingDiscord(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -43,6 +136,96 @@ export default function ConfiguracoesPage() {
             Salvar alterações
           </Button>
         </div>
+      </div>
+
+      {/* Discord Integration Section */}
+      <div className="rounded-lg border border-border bg-card p-6">
+        <div className="mb-4 flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#5865F2]/10">
+            <MessageCircle className="h-5 w-5 text-[#5865F2]" />
+          </div>
+          <div>
+            <h2 className="font-semibold">Discord</h2>
+            <p className="text-sm text-muted-foreground">Vincule sua conta do Discord para receber notificações</p>
+          </div>
+        </div>
+
+        {discordSuccess && (
+          <div className="mb-4 flex items-center gap-2 rounded-lg bg-green-500/10 p-3 text-sm text-green-500">
+            <Check className="h-4 w-4" />
+            {discordSuccess}
+          </div>
+        )}
+
+        {discordError && (
+          <div className="mb-4 flex items-center gap-2 rounded-lg bg-red-500/10 p-3 text-sm text-red-500">
+            <X className="h-4 w-4" />
+            {discordError}
+          </div>
+        )}
+
+        {discordData.linked ? (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between rounded-lg bg-[#5865F2]/10 p-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#5865F2]">
+                  <MessageCircle className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <p className="font-medium">{discordData.discordUsername}</p>
+                  <p className="text-sm text-muted-foreground">
+                    Vinculado em {new Date(discordData.linkedAt!).toLocaleDateString("pt-BR")}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="flex items-center gap-1 text-sm text-green-500">
+                  <Check className="h-4 w-4" />
+                  Conectado
+                </span>
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              onClick={handleUnlinkDiscord}
+              disabled={isLinkingDiscord}
+              className="border-red-500/50 text-red-500 hover:bg-red-500/10"
+            >
+              {isLinkingDiscord ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
+              Desvincular Discord
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="discord-username">Username do Discord</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="discord-username"
+                  placeholder="seu_username"
+                  value={discordUsername}
+                  onChange={(e) => setDiscordUsername(e.target.value)}
+                  className="flex-1"
+                />
+                <Button
+                  onClick={handleLinkDiscord}
+                  disabled={isLinkingDiscord}
+                  className="bg-[#5865F2] text-white hover:bg-[#5865F2]/90"
+                >
+                  {isLinkingDiscord ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : null}
+                  Vincular
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Digite seu username do Discord para receber notificações de drops, promoções e atualizações.
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Security Section */}
