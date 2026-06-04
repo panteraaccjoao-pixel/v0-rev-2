@@ -3,10 +3,10 @@ import crypto from "crypto"
 
 // User credentials - In production, these would be stored in a database
 const TEST_USER = {
-  email: "teste123@gmail.com",
+  email: "teste@teste.com",
   password: "teste123",
-  name: "Usuário Teste",
-  balance: 0
+  name: "Conta Teste",
+  balance: 999
 }
 
 export async function POST(request: NextRequest) {
