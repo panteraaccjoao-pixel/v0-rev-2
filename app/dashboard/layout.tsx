@@ -128,22 +128,6 @@ export default function DashboardLayout({
           </span>
         </div>
 
-        {/* Tutorial Card */}
-        <div className="mx-3 mt-4 rounded-lg border border-border bg-secondary/30 p-3">
-          <div className="flex items-start gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-secondary">
-              <Star className="h-4 w-4 text-foreground" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-foreground">Tutorial de Como Aprovar</p>
-              <p className="text-xs text-muted-foreground">Aprenda a aprovar seus cartões</p>
-              <Link href="/dashboard/tutorial" className="mt-1 text-xs text-accent hover:underline">
-                Ver tutorial →
-              </Link>
-            </div>
-          </div>
-        </div>
-
         {/* Navigation */}
         <div className="flex-1 overflow-y-auto px-3 py-4 scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
           {renderNavSection("Plataforma", platformItems)}
