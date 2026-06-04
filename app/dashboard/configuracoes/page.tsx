@@ -1,19 +1,11 @@
 "use client"
 
-import { useState } from "react"
-import { User, Bell, Shield, Palette, LogOut } from "lucide-react"
+import { User, Shield, Palette, LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
 
 export default function ConfiguracoesPage() {
-  const [notifications, setNotifications] = useState({
-    email: true,
-    drops: true,
-    promocoes: false,
-  })
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -50,54 +42,6 @@ export default function ConfiguracoesPage() {
           <Button className="bg-accent text-accent-foreground hover:bg-accent/90">
             Salvar alterações
           </Button>
-        </div>
-      </div>
-
-      {/* Notifications Section */}
-      <div className="rounded-lg border border-border bg-card p-6">
-        <div className="mb-4 flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent/10">
-            <Bell className="h-5 w-5 text-accent" />
-          </div>
-          <div>
-            <h2 className="font-semibold">Notificações</h2>
-            <p className="text-sm text-muted-foreground">Escolha como deseja ser notificado</p>
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-medium">Notificações por e-mail</p>
-              <p className="text-sm text-muted-foreground">Receba atualizações importantes</p>
-            </div>
-            <Switch
-              checked={notifications.email}
-              onCheckedChange={(checked) => setNotifications({ ...notifications, email: checked })}
-            />
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-medium">Alertas de Drops</p>
-              <p className="text-sm text-muted-foreground">Seja notificado sobre novos drops</p>
-            </div>
-            <Switch
-              checked={notifications.drops}
-              onCheckedChange={(checked) => setNotifications({ ...notifications, drops: checked })}
-            />
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-medium">Promoções</p>
-              <p className="text-sm text-muted-foreground">Receba ofertas e descontos especiais</p>
-            </div>
-            <Switch
-              checked={notifications.promocoes}
-              onCheckedChange={(checked) => setNotifications({ ...notifications, promocoes: checked })}
-            />
-          </div>
         </div>
       </div>
 
