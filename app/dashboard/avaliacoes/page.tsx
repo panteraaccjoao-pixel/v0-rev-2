@@ -353,12 +353,14 @@ export default function AvaliacoesPage() {
       <div className="space-y-4">
         {reviews.length === 0 ? (
           <div className="flex flex-col items-center justify-center rounded-lg border border-border bg-card py-16">
-            <Star className="h-12 w-12 text-muted-foreground/30" />
-            <h3 className="mt-4 text-lg font-semibold">Nenhuma avaliação encontrada</h3>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
+              <Star className="h-8 w-8 text-muted-foreground/50" />
+            </div>
+            <h3 className="mt-4 text-lg font-semibold">Nenhuma avaliação ainda</h3>
+            <p className="mt-1 max-w-sm text-center text-sm text-muted-foreground">
               {filter !== "all" 
                 ? "Não há avaliações com este filtro" 
-                : "Seja o primeiro a deixar uma avaliação!"}
+                : "Seja o primeiro a compartilhar sua experiência! Clique em \"Deixar Avaliação\" acima."}
             </p>
           </div>
         ) : (

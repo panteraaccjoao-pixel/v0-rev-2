@@ -1,74 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 
 // In-memory storage for reviews (replace with database in production)
-let reviews: Review[] = [
-  {
-    id: "1",
-    username: "jvdoparque",
-    rating: 5,
-    comment: "funcionou",
-    productType: "Standard",
-    price: 17.00,
-    createdAt: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000).toISOString(),
-    helpful: 3,
-    imageUrl: null,
-  },
-  {
-    id: "2",
-    username: "godsaveme",
-    rating: 5,
-    comment: "Bom p krai",
-    productType: "Infinite",
-    price: 40.00,
-    createdAt: new Date(Date.now() - 23 * 24 * 60 * 60 * 1000).toISOString(),
-    helpful: 5,
-    imageUrl: null,
-  },
-  {
-    id: "3",
-    username: "Poncexy",
-    rating: 5,
-    comment: "Virada de saldo passou no pagbank na standard",
-    productType: "Standard",
-    price: 70.00,
-    createdAt: new Date(Date.now() - 29 * 24 * 60 * 60 * 1000).toISOString(),
-    helpful: 8,
-    imageUrl: "/placeholder-review.jpg",
-  },
-  {
-    id: "4",
-    username: "carlos_silva",
-    rating: 5,
-    comment: "Excelente! Funcionou perfeitamente",
-    productType: "Black",
-    price: 70.00,
-    createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-    helpful: 2,
-    imageUrl: null,
-  },
-  {
-    id: "5",
-    username: "maria_santos",
-    rating: 3,
-    comment: "Demorou um pouco mas funcionou",
-    productType: "Gold",
-    price: 25.00,
-    createdAt: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString(),
-    helpful: 1,
-    imageUrl: null,
-  },
-  {
-    id: "6",
-    username: "pedro_123",
-    rating: 1,
-    comment: "Não funcionou pra mim",
-    productType: "Standard",
-    price: 15.00,
-    createdAt: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString(),
-    helpful: 0,
-    imageUrl: null,
-  },
-]
+let reviews: Review[] = []
 
 interface Review {
   id: string
