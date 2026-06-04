@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { CreditCard, Search, ChevronDown, ShoppingCart, Check } from "lucide-react"
+import { CreditCard, Search, ChevronDown, ShoppingCart, Check, Grid3X3 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import {
@@ -24,6 +24,11 @@ interface ProductGroup {
   price: number
   count: number
   products: { id: string }[]
+  bin: string
+  bank: string
+  holderName: string
+  expiry: string
+  hasHolderData: boolean
 }
 
 interface PurchasedCard {
@@ -273,50 +278,109 @@ export default function ComprarCartoesPage() {
           </div>
         ) : (
           <div className="grid gap-4 p-6 md:grid-cols-2 lg:grid-cols-3">
-            {products.map((product, index) => (
-              <div 
-                key={`${product.level}-${product.brand}-${index}`}
-                className="group cursor-pointer rounded-lg border border-border bg-card p-4 transition-all hover:border-accent/50 hover:shadow-lg hover:shadow-accent/10"
-                onClick={() => setSelectedProduct(product)}
-              >
-                {/* Card Header */}
-                <div className="flex items-start justify-between mb-4">
-                  <div>
-                    <p className={`text-lg font-bold ${getLevelColor(product.level)}`}>
-                      {product.level}
-                    </p>
-                    <p className="text-xs text-muted-foreground">CREDIT</p>
-                  </div>
-                  {getBrandLogo(product.brand)}
-                </div>
+            {products.map((product, index) => {
+              // Mask holder name for display
+              const maskedName = product.holderName 
+                ? product.holderName.substring(0, 2) + "***" + product.holderName.charAt(product.holderName.length - 1)
+                : ""
+              // Mask expiry
+              const maskedExpiry = product.expiry 
+                ? product.expiry.split("/")[0]?.charAt(0) + "*/" + (product.expiry.split("/")[1]?.substring(0, 2) || "**") + "**"
+                : ""
+              
+              return (
+                <div 
+                  key={`${product.level}-${product.brand}-${index}`}
+                  className="group cursor-pointer overflow-hidden rounded-xl border border-border bg-gradient-to-br from-[#1a1a2e] via-[#16213e] to-[#0f0f1a] transition-all hover:border-red-500/50 hover:shadow-lg hover:shadow-red-500/10"
+                  onClick={() => setSelectedProduct(product)}
+                >
+                  {/* Card Top Section */}
+                  <div className="p-4 pb-3">
+                    <div className="flex items-start justify-between mb-4">
+                      {/* Grid Icon */}
+                      <div className="flex h-8 w-8 items-center justify-center rounded-md bg-amber-500/20">
+                        <Grid3X3 className="h-4 w-4 text-amber-400" />
+                      </div>
+                      
+                      {/* Level Badge */}
+                      <span className={`rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wide ${
+                        product.level === "Infinite" ? "bg-red-500/20 text-red-400" :
+                        product.level === "Black" ? "bg-zinc-700/50 text-zinc-300" :
+                        product.level === "Platinum" ? "bg-slate-400/20 text-slate-300" :
+                        product.level === "Gold" ? "bg-amber-500/20 text-amber-400" :
+                        "bg-gray-500/20 text-gray-400"
+                      }`}>
+                        {product.level}
+                      </span>
+                      
+                      {/* Brand Logo */}
+                      {getBrandLogo(product.brand)}
+                    </div>
 
-                {/* Card Details */}
-                <div className="space-y-2 mb-4">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Disponíveis</span>
-                    <span className="font-medium text-foreground">{product.count}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Bandeira</span>
-                    <span className="font-medium capitalize text-foreground">{product.brand}</span>
-                  </div>
-                </div>
+                    {/* BIN Number */}
+                    <div className="mb-3">
+                      <span className="text-2xl font-bold tracking-wider text-white">
+                        {product.bin || "******"}
+                      </span>
+                      <span className="ml-2 text-lg text-muted-foreground">•• ••••</span>
+                    </div>
 
-                {/* Price & Action */}
-                <div className="flex items-center justify-between pt-4 border-t border-border">
-                  <div>
-                    <p className="text-xs text-muted-foreground">VALOR</p>
-                    <p className="text-xl font-bold text-accent">
-                      R$ {product.price.toFixed(2).replace('.', ',')}
+                    {/* Holder & Expiry Row */}
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground uppercase tracking-wide">
+                        {maskedName || "***** *"}
+                      </span>
+                      <span className="text-muted-foreground">
+                        {maskedExpiry || "**/**"}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Card Bottom Section - Darker */}
+                  <div className="border-t border-white/5 bg-black/30 p-4">
+                    {/* Bank & Price Row */}
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <p className="text-sm font-medium text-white">{product.bank || "Banco"}</p>
+                        <p className="text-xs text-muted-foreground capitalize">{product.brand} • CREDIT</p>
+                      </div>
+                      <p className="text-xl font-bold text-red-500">
+                        R$ {product.price.toFixed(2).replace('.', ',')}
+                      </p>
+                    </div>
+
+                    {/* Data Included Badge */}
+                    {product.hasHolderData && (
+                      <p className="text-xs text-red-400 mb-3">+ Dados incluídos</p>
+                    )}
+
+                    {/* Action Buttons */}
+                    <div className="flex items-center gap-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="flex-1 border-border/50 bg-transparent hover:bg-white/5"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <ShoppingCart className="h-4 w-4 mr-2" />
+                        Carrinho
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                      >
+                        Comprar
+                      </Button>
+                    </div>
+
+                    {/* Stock indicator */}
+                    <p className="mt-2 text-center text-xs text-muted-foreground">
+                      {product.count} disponíve{product.count > 1 ? "is" : "l"}
                     </p>
                   </div>
-                  <Button size="sm" className="gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <ShoppingCart className="h-4 w-4" />
-                    Comprar
-                  </Button>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>

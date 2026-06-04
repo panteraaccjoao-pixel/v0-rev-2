@@ -56,13 +56,30 @@ export async function GET(request: NextRequest) {
         brand: product.brand,
         price: product.price,
         count: 0,
-        products: []
+        products: [] as { id: string }[],
+        // First product info for display
+        bin: product.bin,
+        bank: product.bank,
+        holderName: product.holderName,
+        expiry: product.expiry,
+        hasHolderData: !!(product.holderName || product.cpf || product.birthDate)
       }
     }
     acc[key].count++
-    acc[key].products.push(product)
+    acc[key].products.push({ id: product.id })
     return acc
-  }, {} as Record<string, { level: string; brand: string; price: number; count: number; products: Product[] }>)
+  }, {} as Record<string, { 
+    level: string
+    brand: string
+    price: number
+    count: number
+    products: { id: string }[]
+    bin: string
+    bank: string
+    holderName: string
+    expiry: string
+    hasHolderData: boolean
+  }>)
 
   return NextResponse.json({
     products: filteredProducts,
