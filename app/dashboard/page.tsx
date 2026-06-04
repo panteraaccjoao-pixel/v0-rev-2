@@ -65,10 +65,6 @@ export default function DashboardPage() {
     return `${Math.floor(diff / 86400)} d`
   }
 
-export default function DashboardPage() {
-  const [showDiscordBanner, setShowDiscordBanner] = useState(true)
-  const [searchQuery, setSearchQuery] = useState("")
-
   // Mock user stats
   const stats = {
     compras: 0,
