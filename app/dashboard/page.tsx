@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
 import { 
   CreditCard, 
@@ -14,15 +14,56 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
-// Mock data for recent sales
-const recentSales = [
-  { name: "P*******", type: "Infinite", value: 40.00 },
-  { name: "M*******", type: "Black", value: 40.00 },
-  { name: "A*******", type: "Infinite", value: 40.00 },
-  { name: "M*******", type: "Standard", value: 40.00 },
-  { name: "P*****", type: "Gold", value: 18.00 },
-  { name: "M*******", type: "Platinum", value: 20.00 },
-]
+interface RecentSale {
+  id: string
+  user: string
+  product: string
+  value: number
+  date: string
+}
+
+export default function DashboardPage() {
+  const [showDiscordBanner, setShowDiscordBanner] = useState(true)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [recentSales, setRecentSales] = useState<RecentSale[]>([])
+
+  const fetchRecentSales = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/stats")
+      if (res.ok) {
+        const data = await res.json()
+        setRecentSales(data.recentSales || [])
+      }
+    } catch (error) {
+      console.error("Error fetching recent sales:", error)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchRecentSales()
+    
+    // Poll for updates every 3 seconds
+    const interval = setInterval(fetchRecentSales, 3000)
+    return () => clearInterval(interval)
+  }, [fetchRecentSales])
+
+  // Mask username for privacy
+  const maskUsername = (username: string) => {
+    if (username.length <= 2) return username
+    return username.charAt(0) + "*".repeat(Math.min(username.length - 1, 6))
+  }
+
+  // Format time ago
+  const formatTimeAgo = (dateString: string) => {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diff = Math.floor((now.getTime() - date.getTime()) / 1000)
+    
+    if (diff < 60) return "agora"
+    if (diff < 3600) return `${Math.floor(diff / 60)} min`
+    if (diff < 86400) return `${Math.floor(diff / 3600)} h`
+    return `${Math.floor(diff / 86400)} d`
+  }
 
 export default function DashboardPage() {
   const [showDiscordBanner, setShowDiscordBanner] = useState(true)
@@ -200,28 +241,40 @@ export default function DashboardPage() {
         <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
           <Sparkles className="h-4 w-4 text-accent" />
           Vendas recentes
+          <span className="ml-auto flex h-2 w-2 animate-pulse rounded-full bg-green-500" title="Ao vivo" />
         </div>
         
         <div className="mt-4 space-y-3">
-          {recentSales.map((sale, index) => (
-            <div 
-              key={index} 
-              className="flex items-center justify-between rounded-lg bg-secondary/30 p-3"
-            >
-              <div className="flex items-center gap-3">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-secondary">
-                  <CreditCard className="h-4 w-4 text-muted-foreground" />
+          {recentSales.length > 0 ? (
+            recentSales.map((sale) => (
+              <div 
+                key={sale.id} 
+                className="flex items-center justify-between rounded-lg bg-secondary/30 p-3"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-secondary">
+                    <CreditCard className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-foreground">{maskUsername(sale.user)}</p>
+                    <p className="text-xs text-muted-foreground">{sale.product}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm font-medium text-foreground">{sale.name}</p>
-                  <p className="text-xs text-muted-foreground">{sale.type}</p>
+                <div className="text-right">
+                  <p className="text-sm font-semibold text-accent">
+                    R$ {sale.value.toFixed(2).replace('.', ',')}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{formatTimeAgo(sale.date)}</p>
                 </div>
               </div>
-              <p className="text-sm font-semibold text-accent">
-                R$ {sale.value.toFixed(2).replace('.', ',')}
-              </p>
+            ))
+          ) : (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <CreditCard className="h-8 w-8 text-muted-foreground/50 mb-2" />
+              <p className="text-sm text-muted-foreground">Nenhuma venda ainda</p>
+              <p className="text-xs text-muted-foreground">As vendas aparecem aqui em tempo real</p>
             </div>
-          ))}
+          )}
         </div>
       </aside>
     </div>
