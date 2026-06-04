@@ -18,7 +18,8 @@ import {
   LogOut,
   Database,
   CreditCard,
-  ChevronDown
+  ChevronDown,
+  Zap
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { AdminAuthGuard } from "@/components/admin-auth-guard"
@@ -28,6 +29,7 @@ const sidebarItems = [
   { name: "Usuários", href: "/paineladminseven/usuarios", icon: Users },
   { name: "Recargas", href: "/paineladminseven/recargas", icon: Wallet },
   { name: "Estoque", href: "/paineladminseven/estoque", icon: Package },
+  { name: "Drops", href: "/paineladminseven/drops", icon: Zap },
   { name: "Logins", href: "/paineladminseven/logins", icon: KeyRound },
   { name: "Compras", href: "/paineladminseven/compras", icon: ShoppingCart },
   { name: "Trocas", href: "/paineladminseven/trocas", icon: RefreshCw },
