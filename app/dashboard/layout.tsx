@@ -16,7 +16,8 @@ import {
   FileText,
   LogOut,
   ExternalLink,
-  ChevronRight
+  ChevronRight,
+  RefreshCw
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -31,6 +32,7 @@ const platformItems = [
 const resourceItems = [
   { name: "Drops", href: "/dashboard/drops", icon: Gift },
   { name: "Avaliações", href: "/dashboard/avaliacoes", icon: Star },
+  { name: "Trocas", href: "/dashboard/trocas", icon: RefreshCw },
 ]
 
 const communityItems = [
