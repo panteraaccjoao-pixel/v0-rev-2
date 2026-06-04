@@ -1,7 +1,18 @@
 import { NextRequest, NextResponse } from "next/server"
 
 // In-memory storage for users (replace with database in production)
-let users: User[] = []
+let users: User[] = [
+  {
+    id: "user_teste_001",
+    name: "Conta Teste",
+    email: "teste@teste.com",
+    createdAt: new Date().toISOString(),
+    balance: 999,
+    totalSpent: 0,
+    purchases: 0,
+    status: "active"
+  }
+]
 
 interface User {
   id: string
