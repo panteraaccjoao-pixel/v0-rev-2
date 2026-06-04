@@ -9,7 +9,6 @@ import {
   Wallet, 
   ShoppingBag,
   Gift,
-  Users,
   Star,
   MessageSquare,
   Ticket,
@@ -32,7 +31,6 @@ const platformItems = [
 
 const resourceItems = [
   { name: "Drops", href: "/dashboard/drops", icon: Gift },
-  { name: "Indicação", href: "/dashboard/indicacao", icon: Users },
   { name: "Avaliações", href: "/dashboard/avaliacoes", icon: Star },
 ]
 
