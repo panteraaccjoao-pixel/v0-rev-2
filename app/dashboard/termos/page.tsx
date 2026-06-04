@@ -78,7 +78,8 @@ export default function TermosPage() {
               <li>Duplicação de cobrança</li>
             </ul>
             <p className="mt-4 font-medium text-foreground">
-              Prazo para solicitação: até 24 horas após a compra com prova em vídeo.
+              Prazo para solicitação: até 10 minutos<br />
+              após a compra com prova em vídeo.
             </p>
           </div>
         </div>
