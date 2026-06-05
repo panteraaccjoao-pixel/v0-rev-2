@@ -87,6 +87,8 @@ const getBrandLogo = (brand: string) => {
 export default function EstoquePage() {
   const [search, setSearch] = useState("")
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [products, setProducts] = useState<Product[]>([])
   const [grouped, setGrouped] = useState<ProductGroup[]>([])
   const [totalStock, setTotalStock] = useState(0)
@@ -246,6 +248,31 @@ export default function EstoquePage() {
       }
     } catch (error) {
       console.error("Error deleting product:", error)
+    }
+  }
+
+  const handleEditProduct = (product: Product) => {
+    setEditingProduct(product)
+    setIsEditDialogOpen(true)
+  }
+
+  const handleSaveEdit = async () => {
+    if (!editingProduct) return
+    
+    try {
+      const res = await fetch("/api/estoque", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editingProduct)
+      })
+
+      if (res.ok) {
+        setIsEditDialogOpen(false)
+        setEditingProduct(null)
+        fetchProducts()
+      }
+    } catch (error) {
+      console.error("Error updating product:", error)
     }
   }
 
@@ -580,7 +607,7 @@ export default function EstoquePage() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="bg-card border-border">
-                      <DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleEditProduct(product)}>
                         <Edit className="mr-2 h-4 w-4" />
                         Editar
                       </DropdownMenuItem>
@@ -599,6 +626,191 @@ export default function EstoquePage() {
           ))}
         </div>
       )}
+
+      {/* Edit Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="bg-card border-border max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Editar Cartao</DialogTitle>
+            <DialogDescription>
+              Altere os dados do cartao
+            </DialogDescription>
+          </DialogHeader>
+          {editingProduct && (
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-fullCard">Numero do Cartao</Label>
+                  <Input
+                    id="edit-fullCard"
+                    value={editingProduct.fullCard}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, fullCard: e.target.value, bin: e.target.value.substring(0, 6) })}
+                    className="bg-secondary border-border font-mono"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-bin">BIN</Label>
+                  <Input
+                    id="edit-bin"
+                    value={editingProduct.bin}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, bin: e.target.value })}
+                    className="bg-secondary border-border"
+                    disabled
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-expiry">Validade</Label>
+                  <Input
+                    id="edit-expiry"
+                    placeholder="MM/AA"
+                    value={editingProduct.expiry}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, expiry: e.target.value })}
+                    className="bg-secondary border-border"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-cvv">CVV</Label>
+                  <Input
+                    id="edit-cvv"
+                    value={editingProduct.cvv}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, cvv: e.target.value })}
+                    className="bg-secondary border-border"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-price">Preco (R$)</Label>
+                  <Input
+                    id="edit-price"
+                    type="number"
+                    value={editingProduct.price}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, price: parseFloat(e.target.value) || 0 })}
+                    className="bg-secondary border-border"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-bank">Banco</Label>
+                  <Input
+                    id="edit-bank"
+                    value={editingProduct.bank}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, bank: e.target.value })}
+                    className="bg-secondary border-border"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-brand">Bandeira</Label>
+                  <Select 
+                    value={editingProduct.brand} 
+                    onValueChange={(value) => setEditingProduct({ ...editingProduct, brand: value })}
+                  >
+                    <SelectTrigger className="bg-secondary border-border">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-card border-border">
+                      <SelectItem value="visa">Visa</SelectItem>
+                      <SelectItem value="mastercard">Mastercard</SelectItem>
+                      <SelectItem value="elo">Elo</SelectItem>
+                      <SelectItem value="amex">Amex</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-type">Tipo</Label>
+                  <Select 
+                    value={editingProduct.type} 
+                    onValueChange={(value) => setEditingProduct({ ...editingProduct, type: value })}
+                  >
+                    <SelectTrigger className="bg-secondary border-border">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-card border-border">
+                      <SelectItem value="CREDIT">Credito</SelectItem>
+                      <SelectItem value="DEBIT">Debito</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-level">Nivel</Label>
+                  <Select 
+                    value={editingProduct.level} 
+                    onValueChange={(value) => setEditingProduct({ ...editingProduct, level: value })}
+                  >
+                    <SelectTrigger className="bg-secondary border-border">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-card border-border">
+                      <SelectItem value="Standard">Standard</SelectItem>
+                      <SelectItem value="Gold">Gold</SelectItem>
+                      <SelectItem value="Platinum">Platinum</SelectItem>
+                      <SelectItem value="Black">Black</SelectItem>
+                      <SelectItem value="Infinite">Infinite</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="border-t border-border pt-4">
+                <p className="text-sm font-medium text-muted-foreground mb-4">Dados do Titular</p>
+                <div className="grid gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-holderName">Nome do Titular</Label>
+                    <Input
+                      id="edit-holderName"
+                      value={editingProduct.holderName || ""}
+                      onChange={(e) => setEditingProduct({ ...editingProduct, holderName: e.target.value })}
+                      className="bg-secondary border-border"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-cpf">CPF</Label>
+                      <Input
+                        id="edit-cpf"
+                        value={editingProduct.cpf || ""}
+                        onChange={(e) => setEditingProduct({ ...editingProduct, cpf: e.target.value })}
+                        className="bg-secondary border-border"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-birthDate">Data de Nascimento</Label>
+                      <Input
+                        id="edit-birthDate"
+                        value={editingProduct.birthDate || ""}
+                        onChange={(e) => setEditingProduct({ ...editingProduct, birthDate: e.target.value })}
+                        className="bg-secondary border-border"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  className="flex-1"
+                  onClick={() => {
+                    setIsEditDialogOpen(false)
+                    setEditingProduct(null)
+                  }}
+                >
+                  Cancelar
+                </Button>
+                <Button className="flex-1" onClick={handleSaveEdit}>
+                  Salvar Alteracoes
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

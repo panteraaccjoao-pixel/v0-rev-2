@@ -143,6 +143,44 @@ export async function DELETE(request: NextRequest) {
   }
 }
 
+// PUT - Update product
+export async function PUT(request: NextRequest) {
+  try {
+    const data = await request.json()
+    
+    if (!data.id) {
+      return NextResponse.json({ error: "Product ID required" }, { status: 400 })
+    }
+
+    const index = products.findIndex(p => p.id === data.id)
+    if (index === -1) {
+      return NextResponse.json({ error: "Product not found" }, { status: 404 })
+    }
+
+    // Update the product
+    products[index] = {
+      ...products[index],
+      bin: data.bin || products[index].bin,
+      fullCard: data.fullCard || products[index].fullCard,
+      expiry: data.expiry || products[index].expiry,
+      cvv: data.cvv || products[index].cvv,
+      bank: data.bank || products[index].bank,
+      type: data.type || products[index].type,
+      level: data.level || products[index].level,
+      price: data.price !== undefined ? parseFloat(data.price) : products[index].price,
+      brand: data.brand || products[index].brand,
+      holderName: data.holderName !== undefined ? data.holderName : products[index].holderName,
+      cpf: data.cpf !== undefined ? data.cpf : products[index].cpf,
+      birthDate: data.birthDate !== undefined ? data.birthDate : products[index].birthDate
+    }
+
+    return NextResponse.json({ success: true, product: products[index] })
+  } catch (error) {
+    console.error("Error updating product:", error)
+    return NextResponse.json({ error: "Failed to update product" }, { status: 500 })
+  }
+}
+
 // PATCH - Purchase a product
 export async function PATCH(request: NextRequest) {
   try {
