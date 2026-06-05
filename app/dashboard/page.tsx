@@ -41,26 +41,30 @@ export default function DashboardPage() {
     }
   }, [])
 
+  const fetchBalance = useCallback(async () => {
+    try {
+      const res = await fetch("/api/user/balance")
+      if (res.ok) {
+        const data = await res.json()
+        setUserBalance(data.balance || 0)
+      }
+    } catch (error) {
+      console.error("Error fetching balance:", error)
+    }
+  }, [])
+
   useEffect(() => {
     fetchRecentSales()
+    fetchBalance()
     
     // Poll for updates every 3 seconds
-    const interval = setInterval(fetchRecentSales, 3000)
-    
-    // Fetch user balance from session
-    const session = localStorage.getItem("user_session")
-    if (session) {
-      try {
-        const data = JSON.parse(session)
-        const userData = data.user || data
-        setUserBalance(userData?.balance || 0)
-      } catch {
-        // Ignore parse errors
-      }
-    }
+    const interval = setInterval(() => {
+      fetchRecentSales()
+      fetchBalance()
+    }, 3000)
     
     return () => clearInterval(interval)
-  }, [fetchRecentSales])
+  }, [fetchRecentSales, fetchBalance])
 
   // Mask username for privacy
   const maskUsername = (username: string) => {
