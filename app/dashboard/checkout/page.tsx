@@ -331,6 +331,7 @@ export default function CheckoutPage() {
   }
 
   const handleFinalizePurchase = async () => {
+    console.log("[v0] handleFinalizePurchase called, total:", total, "cartItems:", cartItems)
     setProcessing(true)
     
     try {
