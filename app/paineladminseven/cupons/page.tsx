@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -20,7 +20,9 @@ import {
   Trash2,
   Copy,
   CheckCircle,
-  XCircle
+  XCircle,
+  RefreshCw,
+  Ticket
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -36,54 +38,46 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 
-// Dados de exemplo
-const cupons = [
-  { 
-    id: 1, 
-    code: "PROMO10", 
-    discount: 10, 
-    type: "percent",
-    uses: 45,
-    maxUses: 100,
-    status: "ativo",
-    expiry: "31/01/2024"
-  },
-  { 
-    id: 2, 
-    code: "BEMVINDO", 
-    discount: 5, 
-    type: "fixed",
-    uses: 120,
-    maxUses: null,
-    status: "ativo",
-    expiry: null
-  },
-  { 
-    id: 3, 
-    code: "BLACK50", 
-    discount: 50, 
-    type: "percent",
-    uses: 200,
-    maxUses: 200,
-    status: "expirado",
-    expiry: "30/11/2023"
-  },
-  { 
-    id: 4, 
-    code: "VIP20", 
-    discount: 20, 
-    type: "fixed",
-    uses: 15,
-    maxUses: 50,
-    status: "ativo",
-    expiry: "28/02/2024"
-  },
-]
+interface Cupom {
+  id: string
+  code: string
+  discount: number
+  type: "percent" | "fixed"
+  uses: number
+  maxUses: number | null
+  status: "ativo" | "expirado" | "desativado"
+  expiry: string | null
+  createdAt: string
+}
+
+interface Stats {
+  total: number
+  ativos: number
+  expirados: number
+  totalUsos: number
+}
 
 export default function CuponsPage() {
   const [search, setSearch] = useState("")
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
+  const [cupons, setCupons] = useState<Cupom[]>([])
+  const [stats, setStats] = useState<Stats>({
+    total: 0,
+    ativos: 0,
+    expirados: 0,
+    totalUsos: 0
+  })
+  const [loading, setLoading] = useState(true)
+  const [adding, setAdding] = useState(false)
   const [newCoupon, setNewCoupon] = useState({
     code: "",
     discount: "",
@@ -93,6 +87,88 @@ export default function CuponsPage() {
   })
   const [copied, setCopied] = useState<string | null>(null)
 
+  const fetchCupons = useCallback(async () => {
+    try {
+      const res = await fetch("/api/cupons")
+      if (res.ok) {
+        const data = await res.json()
+        setCupons(data.cupons || [])
+        setStats(data.stats || {
+          total: 0,
+          ativos: 0,
+          expirados: 0,
+          totalUsos: 0
+        })
+      }
+    } catch (error) {
+      console.error("Error fetching cupons:", error)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchCupons()
+    
+    // Poll for updates every 3 seconds
+    const interval = setInterval(fetchCupons, 3000)
+    return () => clearInterval(interval)
+  }, [fetchCupons])
+
+  const handleAddCoupon = async () => {
+    if (!newCoupon.code || !newCoupon.discount) return
+    
+    setAdding(true)
+    try {
+      const res = await fetch("/api/cupons", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "create",
+          ...newCoupon
+        })
+      })
+
+      if (res.ok) {
+        setIsAddDialogOpen(false)
+        setNewCoupon({
+          code: "",
+          discount: "",
+          type: "percent",
+          maxUses: "",
+          expiry: ""
+        })
+        fetchCupons()
+      }
+    } catch (error) {
+      console.error("Error adding coupon:", error)
+    } finally {
+      setAdding(false)
+    }
+  }
+
+  const handleDeleteCoupon = async (id: string) => {
+    try {
+      const res = await fetch(`/api/cupons?id=${id}`, { method: "DELETE" })
+      if (res.ok) fetchCupons()
+    } catch (error) {
+      console.error("Error deleting coupon:", error)
+    }
+  }
+
+  const handleToggleStatus = async (id: string) => {
+    try {
+      const res = await fetch("/api/cupons", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "toggle_status", cupomId: id })
+      })
+      if (res.ok) fetchCupons()
+    } catch (error) {
+      console.error("Error toggling status:", error)
+    }
+  }
+
   const filteredCupons = cupons.filter(
     (cupom) => cupom.code.toLowerCase().includes(search.toLowerCase())
   )
@@ -101,6 +177,11 @@ export default function CuponsPage() {
     navigator.clipboard.writeText(code)
     setCopied(code)
     setTimeout(() => setCopied(null), 2000)
+  }
+
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return "Sem limite"
+    return new Date(dateString).toLocaleDateString("pt-BR")
   }
 
   return (
@@ -113,101 +194,108 @@ export default function CuponsPage() {
             Gerencie os cupons de desconto
           </p>
         </div>
-        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Criar Cupom
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="bg-card border-border">
-            <DialogHeader>
-              <DialogTitle>Criar Novo Cupom</DialogTitle>
-              <DialogDescription>
-                Preencha os dados do cupom de desconto
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="code">Código do Cupom</Label>
-                <Input
-                  id="code"
-                  placeholder="PROMO10"
-                  value={newCoupon.code}
-                  onChange={(e) => setNewCoupon({ ...newCoupon, code: e.target.value.toUpperCase() })}
-                  className="bg-secondary border-border"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="discount">Valor do Desconto</Label>
-                  <Input
-                    id="discount"
-                    type="number"
-                    placeholder="10"
-                    value={newCoupon.discount}
-                    onChange={(e) => setNewCoupon({ ...newCoupon, discount: e.target.value })}
-                    className="bg-secondary border-border"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="type">Tipo</Label>
-                  <Select 
-                    value={newCoupon.type} 
-                    onValueChange={(value) => setNewCoupon({ ...newCoupon, type: value })}
-                  >
-                    <SelectTrigger className="bg-secondary border-border">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-card border-border">
-                      <SelectItem value="percent">Porcentagem (%)</SelectItem>
-                      <SelectItem value="fixed">Valor Fixo (R$)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="maxUses">Limite de Usos</Label>
-                  <Input
-                    id="maxUses"
-                    type="number"
-                    placeholder="100 (vazio = ilimitado)"
-                    value={newCoupon.maxUses}
-                    onChange={(e) => setNewCoupon({ ...newCoupon, maxUses: e.target.value })}
-                    className="bg-secondary border-border"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="expiry">Data de Expiração</Label>
-                  <Input
-                    id="expiry"
-                    type="date"
-                    value={newCoupon.expiry}
-                    onChange={(e) => setNewCoupon({ ...newCoupon, expiry: e.target.value })}
-                    className="bg-secondary border-border"
-                  />
-                </div>
-              </div>
-              <Button className="w-full" onClick={() => setIsAddDialogOpen(false)}>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={fetchCupons}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Atualizar
+          </Button>
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="mr-2 h-4 w-4" />
                 Criar Cupom
               </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+            </DialogTrigger>
+            <DialogContent className="bg-card border-border">
+              <DialogHeader>
+                <DialogTitle>Criar Novo Cupom</DialogTitle>
+                <DialogDescription>
+                  Preencha os dados do cupom de desconto
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="code">Codigo do Cupom</Label>
+                  <Input
+                    id="code"
+                    placeholder="PROMO10"
+                    value={newCoupon.code}
+                    onChange={(e) => setNewCoupon({ ...newCoupon, code: e.target.value.toUpperCase() })}
+                    className="bg-secondary border-border"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="discount">Valor do Desconto</Label>
+                    <Input
+                      id="discount"
+                      type="number"
+                      placeholder="10"
+                      value={newCoupon.discount}
+                      onChange={(e) => setNewCoupon({ ...newCoupon, discount: e.target.value })}
+                      className="bg-secondary border-border"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="type">Tipo</Label>
+                    <Select 
+                      value={newCoupon.type} 
+                      onValueChange={(value) => setNewCoupon({ ...newCoupon, type: value })}
+                    >
+                      <SelectTrigger className="bg-secondary border-border">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-card border-border">
+                        <SelectItem value="percent">Porcentagem (%)</SelectItem>
+                        <SelectItem value="fixed">Valor Fixo (R$)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="maxUses">Limite de Usos</Label>
+                    <Input
+                      id="maxUses"
+                      type="number"
+                      placeholder="100 (vazio = ilimitado)"
+                      value={newCoupon.maxUses}
+                      onChange={(e) => setNewCoupon({ ...newCoupon, maxUses: e.target.value })}
+                      className="bg-secondary border-border"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="expiry">Data de Expiracao</Label>
+                    <Input
+                      id="expiry"
+                      type="date"
+                      value={newCoupon.expiry}
+                      onChange={(e) => setNewCoupon({ ...newCoupon, expiry: e.target.value })}
+                      className="bg-secondary border-border"
+                    />
+                  </div>
+                </div>
+                <Button className="w-full" onClick={handleAddCoupon} disabled={adding}>
+                  {adding ? "Criando..." : "Criar Cupom"}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       {/* Stats */}
       <div className="grid gap-4 md:grid-cols-3">
         <Card className="bg-card border-border">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
               Cupons Ativos
+              <span className="flex h-2 w-2 animate-pulse rounded-full bg-green-500 ml-auto" />
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-500">
-              {cupons.filter(c => c.status === "ativo").length}
+              {stats.ativos}
             </div>
           </CardContent>
         </Card>
@@ -219,7 +307,7 @@ export default function CuponsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {cupons.reduce((acc, c) => acc + c.uses, 0)}
+              {stats.totalUsos}
             </div>
           </CardContent>
         </Card>
@@ -231,7 +319,7 @@ export default function CuponsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-muted-foreground">
-              {cupons.filter(c => c.status === "expirado").length}
+              {stats.expirados}
             </div>
           </CardContent>
         </Card>
@@ -242,7 +330,7 @@ export default function CuponsPage() {
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Buscar por código..."
+            placeholder="Buscar por codigo..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9 bg-secondary border-border"
@@ -251,96 +339,106 @@ export default function CuponsPage() {
       </div>
 
       {/* Cupons Table */}
-      <Card className="bg-card border-border">
-        <CardHeader>
-          <CardTitle>Cupons Cadastrados</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="pb-3 text-left text-sm font-medium text-muted-foreground">Código</th>
-                  <th className="pb-3 text-left text-sm font-medium text-muted-foreground">Desconto</th>
-                  <th className="pb-3 text-left text-sm font-medium text-muted-foreground">Usos</th>
-                  <th className="pb-3 text-left text-sm font-medium text-muted-foreground">Status</th>
-                  <th className="pb-3 text-left text-sm font-medium text-muted-foreground">Expira</th>
-                  <th className="pb-3 text-right text-sm font-medium text-muted-foreground">Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredCupons.map((cupom) => (
-                  <tr key={cupom.id} className="border-b border-border last:border-0">
-                    <td className="py-4">
-                      <div className="flex items-center gap-2">
-                        <code className="rounded bg-secondary px-2 py-1 text-sm font-mono">
-                          {cupom.code}
-                        </code>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="h-7 w-7 p-0"
-                          onClick={() => handleCopy(cupom.code)}
-                        >
-                          {copied === cupom.code ? (
-                            <CheckCircle className="h-3 w-3 text-green-500" />
-                          ) : (
-                            <Copy className="h-3 w-3" />
-                          )}
-                        </Button>
-                      </div>
-                    </td>
-                    <td className="py-4 text-sm font-medium text-accent">
-                      {cupom.type === "percent" ? `${cupom.discount}%` : `R$ ${cupom.discount}`}
-                    </td>
-                    <td className="py-4 text-sm">
-                      {cupom.uses}/{cupom.maxUses || "∞"}
-                    </td>
-                    <td className="py-4">
-                      <span
-                        className={`inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-xs font-medium ${
-                          cupom.status === "ativo"
-                            ? "bg-green-500/10 text-green-500"
-                            : "bg-muted text-muted-foreground"
-                        }`}
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+        </div>
+      ) : filteredCupons.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <Ticket className="h-12 w-12 text-muted-foreground/50 mb-4" />
+          <h3 className="text-lg font-semibold">Nenhum cupom cadastrado</h3>
+          <p className="text-sm text-muted-foreground">Clique em "Criar Cupom" para comecar</p>
+        </div>
+      ) : (
+        <div className="rounded-lg border border-border bg-card">
+          <Table>
+            <TableHeader>
+              <TableRow className="border-border">
+                <TableHead>Codigo</TableHead>
+                <TableHead>Desconto</TableHead>
+                <TableHead>Usos</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Expira</TableHead>
+                <TableHead className="text-right">Acoes</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredCupons.map((cupom) => (
+                <TableRow key={cupom.id} className="border-border">
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <code className="rounded bg-secondary px-2 py-1 text-sm font-mono">
+                        {cupom.code}
+                      </code>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-7 w-7 p-0"
+                        onClick={() => handleCopy(cupom.code)}
                       >
-                        {cupom.status === "ativo" ? (
-                          <CheckCircle className="h-3 w-3" />
+                        {copied === cupom.code ? (
+                          <CheckCircle className="h-3 w-3 text-green-500" />
                         ) : (
-                          <XCircle className="h-3 w-3" />
+                          <Copy className="h-3 w-3" />
                         )}
-                        {cupom.status}
-                      </span>
-                    </td>
-                    <td className="py-4 text-sm text-muted-foreground">
-                      {cupom.expiry || "Sem limite"}
-                    </td>
-                    <td className="py-4 text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="bg-card border-border">
-                          <DropdownMenuItem>
-                            <Edit className="mr-2 h-4 w-4" />
-                            Editar
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="text-red-500">
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Excluir
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+                      </Button>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-sm font-medium text-accent">
+                    {cupom.type === "percent" ? `${cupom.discount}%` : `R$ ${cupom.discount}`}
+                  </TableCell>
+                  <TableCell className="text-sm">
+                    {cupom.uses}/{cupom.maxUses || "∞"}
+                  </TableCell>
+                  <TableCell>
+                    <span
+                      className={`inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-xs font-medium ${
+                        cupom.status === "ativo"
+                          ? "bg-green-500/10 text-green-500"
+                          : cupom.status === "desativado"
+                          ? "bg-yellow-500/10 text-yellow-500"
+                          : "bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      {cupom.status === "ativo" ? (
+                        <CheckCircle className="h-3 w-3" />
+                      ) : (
+                        <XCircle className="h-3 w-3" />
+                      )}
+                      {cupom.status}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {formatDate(cupom.expiry)}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="bg-card border-border">
+                        <DropdownMenuItem onClick={() => handleToggleStatus(cupom.id)}>
+                          <Edit className="mr-2 h-4 w-4" />
+                          {cupom.status === "ativo" ? "Desativar" : "Ativar"}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          className="text-red-500"
+                          onClick={() => handleDeleteCoupon(cupom.id)}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Excluir
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
     </div>
   )
 }

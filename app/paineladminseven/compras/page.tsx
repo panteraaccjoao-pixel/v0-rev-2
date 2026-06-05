@@ -1,10 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Search, Eye, CheckCircle, Clock, XCircle } from "lucide-react"
+import { Search, Eye, CheckCircle, Clock, XCircle, RefreshCw, ShoppingCart } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -12,60 +12,35 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 
-// Dados de exemplo
-const compras = [
-  { 
-    id: 1, 
-    user: "joao@email.com", 
-    userName: "João Silva",
-    product: "CC Platinum Santander",
-    bin: "520132",
-    value: 45.00, 
-    status: "entregue",
-    date: "14/01/2024 15:30"
-  },
-  { 
-    id: 2, 
-    user: "maria@email.com", 
-    userName: "Maria Santos",
-    product: "CC Gold Itaú",
-    bin: "450123",
-    value: 35.00, 
-    status: "entregue",
-    date: "14/01/2024 14:20"
-  },
-  { 
-    id: 3, 
-    user: "pedro@email.com", 
-    userName: "Pedro Costa",
-    product: "CC Black Nubank",
-    bin: "540721",
-    value: 80.00, 
-    status: "pendente",
-    date: "14/01/2024 13:15"
-  },
-  { 
-    id: 4, 
-    user: "ana@email.com", 
-    userName: "Ana Oliveira",
-    product: "CC Infinite Bradesco",
-    bin: "410256",
-    value: 120.00, 
-    status: "entregue",
-    date: "14/01/2024 12:00"
-  },
-  { 
-    id: 5, 
-    user: "lucas@email.com", 
-    userName: "Lucas Pereira",
-    product: "CC Platinum Santander",
-    bin: "520132",
-    value: 45.00, 
-    status: "cancelado",
-    date: "14/01/2024 11:30"
-  },
-]
+interface Compra {
+  id: string
+  userId: string
+  userName: string
+  userEmail: string
+  productId: string
+  productName: string
+  bin: string
+  value: number
+  status: "entregue" | "pendente" | "cancelado"
+  createdAt: string
+}
+
+interface Stats {
+  total: number
+  entregues: number
+  pendentes: number
+  cancelados: number
+  totalVendas: number
+}
 
 const getStatusIcon = (status: string) => {
   switch (status) {
@@ -93,41 +68,108 @@ const getStatusStyle = (status: string) => {
   }
 }
 
+const getStatusLabel = (status: string) => {
+  switch (status) {
+    case "entregue":
+      return "Entregue"
+    case "pendente":
+      return "Pendente"
+    case "cancelado":
+      return "Cancelado"
+    default:
+      return status
+  }
+}
+
 export default function ComprasPage() {
   const [search, setSearch] = useState("")
-  const [selectedCompra, setSelectedCompra] = useState<typeof compras[0] | null>(null)
+  const [selectedCompra, setSelectedCompra] = useState<Compra | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [compras, setCompras] = useState<Compra[]>([])
+  const [stats, setStats] = useState<Stats>({
+    total: 0,
+    entregues: 0,
+    pendentes: 0,
+    cancelados: 0,
+    totalVendas: 0
+  })
+  const [loading, setLoading] = useState(true)
+
+  const fetchCompras = useCallback(async () => {
+    try {
+      const res = await fetch("/api/compras")
+      if (res.ok) {
+        const data = await res.json()
+        setCompras(data.compras || [])
+        setStats(data.stats || {
+          total: 0,
+          entregues: 0,
+          pendentes: 0,
+          cancelados: 0,
+          totalVendas: 0
+        })
+      }
+    } catch (error) {
+      console.error("Error fetching compras:", error)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchCompras()
+    
+    // Poll for updates every 3 seconds
+    const interval = setInterval(fetchCompras, 3000)
+    return () => clearInterval(interval)
+  }, [fetchCompras])
 
   const filteredCompras = compras.filter(
     (compra) =>
-      compra.user.toLowerCase().includes(search.toLowerCase()) ||
+      compra.userEmail.toLowerCase().includes(search.toLowerCase()) ||
       compra.userName.toLowerCase().includes(search.toLowerCase()) ||
-      compra.product.toLowerCase().includes(search.toLowerCase())
+      compra.productName.toLowerCase().includes(search.toLowerCase())
   )
 
-  const totalVendas = compras.filter(c => c.status === "entregue").reduce((acc, c) => acc + c.value, 0)
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL"
+    }).format(value)
+  }
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleString("pt-BR")
+  }
 
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Compras</h1>
-        <p className="text-muted-foreground">
-          Histórico de compras realizadas no site
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Compras</h1>
+          <p className="text-muted-foreground">
+            Historico de compras realizadas no site
+          </p>
+        </div>
+        <Button variant="outline" size="sm" onClick={fetchCompras}>
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Atualizar
+        </Button>
       </div>
 
       {/* Stats */}
       <div className="grid gap-4 md:grid-cols-4">
         <Card className="bg-card border-border">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
               Total de Vendas
+              <span className="flex h-2 w-2 animate-pulse rounded-full bg-green-500 ml-auto" />
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-accent">
-              R$ {totalVendas.toFixed(2)}
+              {formatCurrency(stats.totalVendas)}
             </div>
           </CardContent>
         </Card>
@@ -139,7 +181,7 @@ export default function ComprasPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-500">
-              {compras.filter(c => c.status === "entregue").length}
+              {stats.entregues}
             </div>
           </CardContent>
         </Card>
@@ -151,7 +193,7 @@ export default function ComprasPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-yellow-500">
-              {compras.filter(c => c.status === "pendente").length}
+              {stats.pendentes}
             </div>
           </CardContent>
         </Card>
@@ -163,7 +205,7 @@ export default function ComprasPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-500">
-              {compras.filter(c => c.status === "cancelado").length}
+              {stats.cancelados}
             </div>
           </CardContent>
         </Card>
@@ -183,100 +225,107 @@ export default function ComprasPage() {
       </div>
 
       {/* Compras Table */}
-      <Card className="bg-card border-border">
-        <CardHeader>
-          <CardTitle>Histórico de Compras</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="pb-3 text-left text-sm font-medium text-muted-foreground">ID</th>
-                  <th className="pb-3 text-left text-sm font-medium text-muted-foreground">Usuário</th>
-                  <th className="pb-3 text-left text-sm font-medium text-muted-foreground">Produto</th>
-                  <th className="pb-3 text-left text-sm font-medium text-muted-foreground">Valor</th>
-                  <th className="pb-3 text-left text-sm font-medium text-muted-foreground">Status</th>
-                  <th className="pb-3 text-left text-sm font-medium text-muted-foreground">Data</th>
-                  <th className="pb-3 text-right text-sm font-medium text-muted-foreground">Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredCompras.map((compra) => (
-                  <tr key={compra.id} className="border-b border-border last:border-0">
-                    <td className="py-4 text-sm text-muted-foreground">#{compra.id}</td>
-                    <td className="py-4">
-                      <div>
-                        <p className="text-sm font-medium">{compra.userName}</p>
-                        <p className="text-xs text-muted-foreground">{compra.user}</p>
-                      </div>
-                    </td>
-                    <td className="py-4">
-                      <div>
-                        <p className="text-sm font-medium">{compra.product}</p>
-                        <p className="text-xs text-muted-foreground">BIN: {compra.bin}</p>
-                      </div>
-                    </td>
-                    <td className="py-4 text-sm font-medium text-accent">
-                      R$ {compra.value.toFixed(2)}
-                    </td>
-                    <td className="py-4">
-                      <span
-                        className={`inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-xs font-medium ${getStatusStyle(compra.status)}`}
-                      >
-                        {getStatusIcon(compra.status)}
-                        {compra.status}
-                      </span>
-                    </td>
-                    <td className="py-4 text-sm text-muted-foreground">{compra.date}</td>
-                    <td className="py-4 text-right">
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={() => {
-                          setSelectedCompra(compra)
-                          setIsDialogOpen(true)
-                        }}
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+        </div>
+      ) : filteredCompras.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <ShoppingCart className="h-12 w-12 text-muted-foreground/50 mb-4" />
+          <h3 className="text-lg font-semibold">Nenhuma compra encontrada</h3>
+          <p className="text-sm text-muted-foreground">As compras aparecem aqui em tempo real</p>
+        </div>
+      ) : (
+        <div className="rounded-lg border border-border bg-card">
+          <Table>
+            <TableHeader>
+              <TableRow className="border-border">
+                <TableHead>ID</TableHead>
+                <TableHead>Usuario</TableHead>
+                <TableHead>Produto</TableHead>
+                <TableHead>Valor</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Data</TableHead>
+                <TableHead className="text-right">Acoes</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredCompras.map((compra) => (
+                <TableRow key={compra.id} className="border-border">
+                  <TableCell className="text-sm text-muted-foreground font-mono">
+                    #{compra.id.split("_")[1]?.substring(0, 8) || compra.id.substring(0, 8)}
+                  </TableCell>
+                  <TableCell>
+                    <div>
+                      <p className="text-sm font-medium">{compra.userName}</p>
+                      <p className="text-xs text-muted-foreground">{compra.userEmail}</p>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div>
+                      <p className="text-sm font-medium">{compra.productName}</p>
+                      <p className="text-xs text-muted-foreground">BIN: {compra.bin}</p>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-sm font-medium text-accent">
+                    {formatCurrency(compra.value)}
+                  </TableCell>
+                  <TableCell>
+                    <span
+                      className={`inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-xs font-medium ${getStatusStyle(compra.status)}`}
+                    >
+                      {getStatusIcon(compra.status)}
+                      {getStatusLabel(compra.status)}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{formatDate(compra.createdAt)}</TableCell>
+                  <TableCell className="text-right">
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => {
+                        setSelectedCompra(compra)
+                        setIsDialogOpen(true)
+                      }}
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
 
       {/* View Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="bg-card border-border">
           <DialogHeader>
-            <DialogTitle>Detalhes da Compra #{selectedCompra?.id}</DialogTitle>
+            <DialogTitle>Detalhes da Compra #{selectedCompra?.id.split("_")[1]?.substring(0, 8)}</DialogTitle>
             <DialogDescription>
-              Informações completas da compra
+              Informacoes completas da compra
             </DialogDescription>
           </DialogHeader>
           {selectedCompra && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-sm text-muted-foreground">Usuário</p>
+                  <p className="text-sm text-muted-foreground">Usuario</p>
                   <p className="font-medium">{selectedCompra.userName}</p>
-                  <p className="text-sm text-muted-foreground">{selectedCompra.user}</p>
+                  <p className="text-sm text-muted-foreground">{selectedCompra.userEmail}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Data</p>
-                  <p className="font-medium">{selectedCompra.date}</p>
+                  <p className="font-medium">{formatDate(selectedCompra.createdAt)}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Produto</p>
-                  <p className="font-medium">{selectedCompra.product}</p>
+                  <p className="font-medium">{selectedCompra.productName}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Valor</p>
-                  <p className="font-medium text-accent">R$ {selectedCompra.value.toFixed(2)}</p>
+                  <p className="font-medium text-accent">{formatCurrency(selectedCompra.value)}</p>
                 </div>
               </div>
             </div>
