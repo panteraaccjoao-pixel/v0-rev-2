@@ -17,7 +17,8 @@ import {
   UserX,
   RefreshCw,
   DollarSign,
-  ShoppingCart
+  ShoppingCart,
+  MessageCircle
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -50,6 +51,7 @@ interface User {
   totalSpent: number
   purchases: number
   status: "active" | "blocked"
+  discordId?: string
 }
 
 export default function UsuariosPage() {
@@ -248,6 +250,7 @@ export default function UsuariosPage() {
             <TableHeader>
               <TableRow className="border-border">
                 <TableHead>Usuário</TableHead>
+                <TableHead>Discord ID</TableHead>
                 <TableHead>Saldo</TableHead>
                 <TableHead>Total Gasto</TableHead>
                 <TableHead>Compras</TableHead>
@@ -264,6 +267,16 @@ export default function UsuariosPage() {
                       <p className="font-medium">{user.name}</p>
                       <p className="text-sm text-muted-foreground">{user.email}</p>
                     </div>
+                  </TableCell>
+                  <TableCell>
+                    {user.discordId ? (
+                      <div className="flex items-center gap-2 text-[#5865F2]">
+                        <MessageCircle className="h-4 w-4" />
+                        <span className="font-mono text-sm">{user.discordId}</span>
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground text-sm">-</span>
+                    )}
                   </TableCell>
                   <TableCell className="font-medium text-accent">
                     {formatCurrency(user.balance)}

@@ -48,6 +48,21 @@ export async function POST(request: NextRequest) {
       linkedAt: new Date().toISOString()
     })
 
+    // Also update the user record with the discord ID
+    try {
+      await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/users`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          action: "set_discord", 
+          email: "teste@teste.com", // Default user for now
+          discordId: discordId.trim()
+        })
+      })
+    } catch (e) {
+      console.error("Failed to update user discord:", e)
+    }
+
     return NextResponse.json({
       success: true,
       message: "Discord vinculado com sucesso",

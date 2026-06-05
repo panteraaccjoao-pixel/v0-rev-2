@@ -10,7 +10,8 @@ let users: User[] = [
     balance: 0,
     totalSpent: 0,
     purchases: 0,
-    status: "active"
+    status: "active",
+    discordId: ""
   }
 ]
 
@@ -23,6 +24,7 @@ interface User {
   totalSpent: number
   purchases: number
   status: "active" | "blocked"
+  discordId?: string
 }
 
 // GET - List all users
@@ -53,7 +55,8 @@ export async function POST(request: NextRequest) {
         balance: 0,
         totalSpent: 0,
         purchases: 0,
-        status: "active"
+        status: "active",
+        discordId: data.discordId || ""
       }
 
       users.push(newUser)
@@ -109,6 +112,16 @@ export async function POST(request: NextRequest) {
       }
 
       user.status = "active"
+      return NextResponse.json({ success: true, user })
+    }
+
+    if (data.action === "set_discord") {
+      const user = users.find(u => u.id === data.userId || u.email === data.email)
+      if (!user) {
+        return NextResponse.json({ error: "User not found" }, { status: 404 })
+      }
+
+      user.discordId = data.discordId || ""
       return NextResponse.json({ success: true, user })
     }
 

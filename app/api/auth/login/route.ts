@@ -92,6 +92,23 @@ export async function POST(request: NextRequest) {
         success: true,
         discordId: discordId || undefined
       })
+
+      // If discord ID provided, update the user record
+      if (discordId) {
+        try {
+          await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/users`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ 
+              action: "set_discord", 
+              email: sanitizedEmail,
+              discordId: discordId.trim()
+            })
+          })
+        } catch (e) {
+          console.error("Failed to update user discord:", e)
+        }
+      }
       
       const response = NextResponse.json({
         success: true,
