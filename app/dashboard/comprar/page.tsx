@@ -447,6 +447,20 @@ export default function ComprarCartoesPage() {
                       <Button 
                         size="sm" 
                         className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          // Save single item to checkout and redirect
+                          const checkoutItems = [{
+                            id: product.products?.[0]?.id || `item_${Date.now()}`,
+                            level: product.level,
+                            brand: product.brand,
+                            bin: product.bin,
+                            price: product.price,
+                            quantity: 1
+                          }]
+                          localStorage.setItem("checkout_cart", JSON.stringify(checkoutItems))
+                          router.push("/dashboard/checkout")
+                        }}
                       >
                         Comprar
                       </Button>
