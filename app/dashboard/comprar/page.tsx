@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { CreditCard, Search, ChevronDown, ShoppingCart, Check, Grid3X3 } from "lucide-react"
+import { CreditCard, Search, ChevronDown, ShoppingCart, Check, Grid3X3, X, Plus, Minus, Trash2 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import {
@@ -45,6 +45,11 @@ interface PurchasedCard {
   birthDate?: string
 }
 
+interface CartItem {
+  product: ProductGroup
+  quantity: number
+}
+
 export default function ComprarCartoesPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [nivel, setNivel] = useState("Nível")
@@ -56,6 +61,8 @@ export default function ComprarCartoesPage() {
   const [purchasing, setPurchasing] = useState(false)
   const [purchaseSuccess, setPurchaseSuccess] = useState(false)
   const [purchasedCard, setPurchasedCard] = useState<PurchasedCard | null>(null)
+  const [cart, setCart] = useState<CartItem[]>([])
+  const [showCart, setShowCart] = useState(false)
 
   const fetchProducts = useCallback(async () => {
     try {
@@ -124,6 +131,59 @@ export default function ComprarCartoesPage() {
     setPurchasedCard(null)
   }
 
+  const addToCart = (product: ProductGroup, e: React.MouseEvent) => {
+    e.stopPropagation()
+    
+    setCart(prevCart => {
+      const existingItem = prevCart.find(
+        item => item.product.bin === product.bin && 
+                item.product.level === product.level && 
+                item.product.brand === product.brand
+      )
+      
+      if (existingItem) {
+        // Increment quantity if item exists (max = available count)
+        if (existingItem.quantity < product.count) {
+          return prevCart.map(item => 
+            item === existingItem 
+              ? { ...item, quantity: item.quantity + 1 }
+              : item
+          )
+        }
+        return prevCart
+      }
+      
+      // Add new item
+      return [...prevCart, { product, quantity: 1 }]
+    })
+  }
+
+  const removeFromCart = (index: number) => {
+    setCart(prevCart => prevCart.filter((_, i) => i !== index))
+  }
+
+  const updateCartQuantity = (index: number, newQuantity: number) => {
+    setCart(prevCart => {
+      const item = prevCart[index]
+      if (!item) return prevCart
+      
+      if (newQuantity <= 0) {
+        return prevCart.filter((_, i) => i !== index)
+      }
+      
+      if (newQuantity > item.product.count) {
+        return prevCart
+      }
+      
+      return prevCart.map((item, i) => 
+        i === index ? { ...item, quantity: newQuantity } : item
+      )
+    })
+  }
+
+  const cartTotal = cart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0)
+  const cartItemsCount = cart.reduce((sum, item) => sum + item.quantity, 0)
+
   const getBrandLogo = (brand: string) => {
     if (brand === "mastercard") {
       return (
@@ -167,11 +227,28 @@ export default function ComprarCartoesPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Comprar Cartões</h1>
-        <p className="text-sm text-muted-foreground">
-          Escolha um cartão e visualize os detalhes antes de comprar
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Comprar Cartoes</h1>
+          <p className="text-sm text-muted-foreground">
+            Escolha um cartao e visualize os detalhes antes de comprar
+          </p>
+        </div>
+        
+        {/* Cart Button */}
+        <Button 
+          variant="outline" 
+          className="relative gap-2"
+          onClick={() => setShowCart(true)}
+        >
+          <ShoppingCart className="h-5 w-5" />
+          Carrinho
+          {cartItemsCount > 0 && (
+            <span className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">
+              {cartItemsCount}
+            </span>
+          )}
+        </Button>
       </div>
 
       {/* Filter Bar */}
@@ -360,7 +437,7 @@ export default function ComprarCartoesPage() {
                         variant="outline" 
                         size="sm" 
                         className="flex-1 border-border/50 bg-transparent hover:bg-white/5"
-                        onClick={(e) => e.stopPropagation()}
+                        onClick={(e) => addToCart(product, e)}
                       >
                         <ShoppingCart className="h-4 w-4 mr-2" />
                         Carrinho
@@ -514,6 +591,105 @@ export default function ComprarCartoesPage() {
                   </Button>
                 </>
               )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Cart Dialog */}
+      <Dialog open={showCart} onOpenChange={setShowCart}>
+        <DialogContent className="bg-card border-border max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShoppingCart className="h-5 w-5" />
+              Carrinho
+            </DialogTitle>
+            <DialogDescription>
+              {cart.length === 0 
+                ? "Seu carrinho esta vazio" 
+                : `${cartItemsCount} item(s) no carrinho`}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {cart.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <ShoppingCart className="h-12 w-12 text-muted-foreground mb-4" />
+              <p className="text-muted-foreground">Adicione itens ao carrinho para comprar</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* Cart Items */}
+              <div className="max-h-[300px] overflow-y-auto space-y-3">
+                {cart.map((item, index) => (
+                  <div 
+                    key={`${item.product.bin}-${item.product.level}-${index}`}
+                    className="flex items-center justify-between rounded-lg bg-secondary/50 p-3"
+                  >
+                    <div className="flex-1">
+                      <p className="font-medium text-sm">
+                        {item.product.level} {item.product.brand}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        BIN: {item.product.bin} - R$ {item.product.price.toFixed(2).replace('.', ',')}
+                      </p>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1 rounded-lg border border-border">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => updateCartQuantity(index, item.quantity - 1)}
+                        >
+                          <Minus className="h-3 w-3" />
+                        </Button>
+                        <span className="w-6 text-center text-sm font-medium">
+                          {item.quantity}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => updateCartQuantity(index, item.quantity + 1)}
+                          disabled={item.quantity >= item.product.count}
+                        >
+                          <Plus className="h-3 w-3" />
+                        </Button>
+                      </div>
+                      
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-red-500 hover:text-red-600 hover:bg-red-500/10"
+                        onClick={() => removeFromCart(index)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              {/* Cart Total */}
+              <div className="border-t border-border pt-4">
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-muted-foreground">Total</span>
+                  <span className="text-xl font-bold text-accent">
+                    R$ {cartTotal.toFixed(2).replace('.', ',')}
+                  </span>
+                </div>
+                
+                <Button 
+                  className="w-full bg-red-600 hover:bg-red-700"
+                  onClick={() => {
+                    // TODO: Implement batch purchase
+                    alert("Funcionalidade de compra em lote em desenvolvimento")
+                  }}
+                >
+                  Finalizar Compra
+                </Button>
+              </div>
             </div>
           )}
         </DialogContent>
