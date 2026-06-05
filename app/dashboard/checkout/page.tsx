@@ -82,6 +82,38 @@ export default function CheckoutPage() {
     }
   }, [searchParams])
 
+  // Create order after successful delivery
+  const createOrder = useCallback(async (cards: DeliveredCard[]) => {
+    try {
+      for (const card of cards) {
+        await fetch("/api/pedidos", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: "user_teste_001",
+            userName: "Conta Teste",
+            product: `${card.level} ${card.brand}`,
+            level: card.level,
+            brand: card.brand,
+            total: cartItems.find(i => i.level === card.level && i.brand === card.brand)?.price || 0,
+            cardData: {
+              fullCard: card.fullCard.replace(/\s/g, ""),
+              cvv: card.cvv,
+              expiry: card.expiry,
+              bin: card.bin,
+              bank: card.bank,
+              holderName: card.holderName,
+              cpf: card.cpf,
+              birthDate: card.birthDate
+            }
+          })
+        })
+      }
+    } catch (error) {
+      console.error("Error creating order:", error)
+    }
+  }, [cartItems])
+
   // Fetch delivered cards after payment
   const fetchDeliveredCards = useCallback(async () => {
     setLoadingDelivery(true)
@@ -107,7 +139,7 @@ export default function CheckoutPage() {
           }
         }
         
-        setDeliveredCards(cards.length > 0 ? cards : [{
+        const finalCards = cards.length > 0 ? cards : [{
           fullCard: "4532 1234 5678 9012",
           cvv: "123",
           expiry: "12/27",
@@ -117,10 +149,13 @@ export default function CheckoutPage() {
           brand: cartItems[0]?.brand || "Visa",
           holderName: "NOME DO TITULAR",
           cpf: "123.456.789-00"
-        }])
+        }]
+        setDeliveredCards(finalCards)
+        // Create order for each card
+        await createOrder(finalCards)
       } else {
         // Fallback card for demo
-        setDeliveredCards([{
+        const fallbackCards = [{
           fullCard: "4532 1234 5678 9012",
           cvv: "123",
           expiry: "12/27",
@@ -130,12 +165,14 @@ export default function CheckoutPage() {
           brand: cartItems[0]?.brand || "Visa",
           holderName: "NOME DO TITULAR",
           cpf: "123.456.789-00"
-        }])
+        }]
+        setDeliveredCards(fallbackCards)
+        await createOrder(fallbackCards)
       }
     } catch (error) {
       console.error("Error fetching cards:", error)
       // Fallback
-      setDeliveredCards([{
+      const fallbackCards = [{
         fullCard: "4532 1234 5678 9012",
         cvv: "123",
         expiry: "12/27",
@@ -143,11 +180,13 @@ export default function CheckoutPage() {
         bank: "Banco Exemplo",
         level: cartItems[0]?.level || "Standard",
         brand: cartItems[0]?.brand || "Visa"
-      }])
+      }]
+      setDeliveredCards(fallbackCards)
+      await createOrder(fallbackCards)
     } finally {
       setLoadingDelivery(false)
     }
-  }, [cartItems])
+  }, [cartItems, createOrder])
 
   // Poll for payment status
   const checkPaymentStatus = useCallback(async () => {
