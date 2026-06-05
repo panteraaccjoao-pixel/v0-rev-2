@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Zap } from "lucide-react"
 
 export function Footer() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const router = useRouter()
 
   useEffect(() => {
-    // Check if user is authenticated
     const checkAuth = () => {
       const authCookie = document.cookie
         .split("; ")
@@ -17,10 +18,18 @@ export function Footer() {
     }
     
     checkAuth()
-    // Listen for storage changes (login/logout)
     window.addEventListener("storage", checkAuth)
     return () => window.removeEventListener("storage", checkAuth)
   }, [])
+
+  const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+    e.preventDefault()
+    if (isAuthenticated) {
+      router.push(href)
+    } else {
+      router.push("/login")
+    }
+  }
 
   return (
     <footer className="border-t border-border bg-background">
@@ -39,32 +48,33 @@ export function Footer() {
             </div>
           </div>
           
-          {/* Navigation - Only show if authenticated */}
-          {isAuthenticated && (
-            <div className="space-y-4">
-              <h4 className="text-sm font-semibold text-foreground">Navegação</h4>
-              <nav className="flex flex-col gap-2">
-                <Link 
-                  href="/dashboard" 
-                  className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  Dashboard
-                </Link>
-                <Link 
-                  href="/dashboard/comprar" 
-                  className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  Comprar Cartões
-                </Link>
-                <Link 
-                  href="/dashboard/recarregar" 
-                  className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-                >
-                  Recarregar Saldo
-                </Link>
-              </nav>
-            </div>
-          )}
+          {/* Navigation */}
+          <div className="space-y-4">
+            <h4 className="text-sm font-semibold text-foreground">Navegação</h4>
+            <nav className="flex flex-col gap-2">
+              <a 
+                href="/dashboard"
+                onClick={(e) => handleNavClick(e, "/dashboard")}
+                className="text-sm text-muted-foreground transition-colors hover:text-foreground cursor-pointer"
+              >
+                Dashboard
+              </a>
+              <a 
+                href="/dashboard/comprar"
+                onClick={(e) => handleNavClick(e, "/dashboard/comprar")}
+                className="text-sm text-muted-foreground transition-colors hover:text-foreground cursor-pointer"
+              >
+                Comprar Cartões
+              </a>
+              <a 
+                href="/dashboard/recarregar"
+                onClick={(e) => handleNavClick(e, "/dashboard/recarregar")}
+                className="text-sm text-muted-foreground transition-colors hover:text-foreground cursor-pointer"
+              >
+                Recarregar Saldo
+              </a>
+            </nav>
+          </div>
           
           {/* Help */}
           <div className="space-y-4">
