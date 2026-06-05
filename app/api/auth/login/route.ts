@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import crypto from "crypto"
 import { addLoginRecord } from "@/app/api/admin/logins/route"
+import { checkRateLimit, getClientIP } from "@/lib/rate-limit"
+import { sanitizeInput, isValidEmail, rateLimitResponse } from "@/lib/security"
 
 // User credentials - In production, these would be stored in a database
 const TEST_USER = {
@@ -38,7 +40,32 @@ function parseUserAgent(ua: string): { device: string; deviceType: "desktop" | "
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limiting for login attempts
+    const clientIP = getClientIP(request)
+    const rateLimit = checkRateLimit(clientIP, "login")
+    
+    if (!rateLimit.allowed) {
+      return rateLimitResponse(rateLimit.resetIn)
+    }
+
     const { email, password } = await request.json()
+    
+    // Validate input
+    if (!email || !password) {
+      return NextResponse.json({
+        success: false,
+        message: "Email e senha sao obrigatorios"
+      }, { status: 400 })
+    }
+
+    // Sanitize and validate email
+    const sanitizedEmail = sanitizeInput(email).toLowerCase()
+    if (!isValidEmail(sanitizedEmail)) {
+      return NextResponse.json({
+        success: false,
+        message: "Email invalido"
+      }, { status: 400 })
+    }
     
     // Get IP and user agent
     const ip = request.headers.get("x-forwarded-for")?.split(",")[0] || 

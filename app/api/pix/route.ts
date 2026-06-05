@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
+import { checkRateLimit, getClientIP } from "@/lib/rate-limit"
+import { rateLimitResponse } from "@/lib/security"
 
 // In-memory storage for PIX payments
 interface PixPayment {
@@ -35,6 +37,14 @@ function generateQRCodeUrl(pixCode: string): string {
 // POST - Create new PIX payment
 export async function POST(request: NextRequest) {
   try {
+    // Rate limiting for PIX creation
+    const clientIP = getClientIP(request)
+    const rateLimit = checkRateLimit(clientIP, "pix")
+    
+    if (!rateLimit.allowed) {
+      return rateLimitResponse(rateLimit.resetIn)
+    }
+
     const data = await request.json()
     const { amount, items } = data
 
