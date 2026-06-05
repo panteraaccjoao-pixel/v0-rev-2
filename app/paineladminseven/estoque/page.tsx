@@ -92,6 +92,7 @@ export default function EstoquePage() {
   const [totalStock, setTotalStock] = useState(0)
   const [loading, setLoading] = useState(true)
   const [adding, setAdding] = useState(false)
+  const [quickInput, setQuickInput] = useState("")
   const [newProduct, setNewProduct] = useState({
     bin: "",
     bank: "",
@@ -106,6 +107,58 @@ export default function EstoquePage() {
     cpf: "",
     birthDate: ""
   })
+
+  // Parse quick input format: CARD|MM|YYYY|CVV|NOME:XXX|CPF:XXX|NASC:XX/XX/XXXX
+  const parseQuickInput = (input: string) => {
+    const parts = input.split("|")
+    if (parts.length < 4) return
+    
+    const fullCard = parts[0]?.trim() || ""
+    const month = parts[1]?.trim() || ""
+    const year = parts[2]?.trim() || ""
+    const cvv = parts[3]?.trim() || ""
+    
+    // Parse additional data (NOME:, CPF:, NASC:)
+    let holderName = ""
+    let cpf = ""
+    let birthDate = ""
+    
+    for (let i = 4; i < parts.length; i++) {
+      const part = parts[i]?.trim() || ""
+      if (part.toUpperCase().startsWith("NOME:")) {
+        holderName = part.substring(5).trim()
+      } else if (part.toUpperCase().startsWith("CPF:")) {
+        cpf = part.substring(4).trim()
+      } else if (part.toUpperCase().startsWith("NASC:")) {
+        birthDate = part.substring(5).trim()
+      }
+    }
+    
+    // Format expiry as MM/YY or MM/YYYY
+    const expiry = year.length === 4 ? `${month}/${year.substring(2)}` : `${month}/${year}`
+    
+    // Detect brand from BIN
+    const bin = fullCard.substring(0, 6)
+    let brand = "visa"
+    if (bin.startsWith("4")) brand = "visa"
+    else if (bin.startsWith("5") || bin.startsWith("2")) brand = "mastercard"
+    else if (bin.startsWith("6")) brand = "elo"
+    else if (bin.startsWith("3")) brand = "amex"
+    
+    setNewProduct({
+      ...newProduct,
+      fullCard,
+      bin,
+      expiry,
+      cvv,
+      holderName,
+      cpf,
+      birthDate,
+      brand
+    })
+    
+    setQuickInput("")
+  }
 
   const fetchProducts = useCallback(async () => {
     try {
@@ -142,6 +195,7 @@ export default function EstoquePage() {
 
       if (res.ok) {
         setIsAddDialogOpen(false)
+        setQuickInput("")
         setNewProduct({
           bin: "",
           bank: "",
@@ -203,14 +257,45 @@ export default function EstoquePage() {
                 Adicionar Cartão
               </Button>
             </DialogTrigger>
-            <DialogContent className="bg-card border-border max-w-2xl">
+            <DialogContent className="bg-card border-border max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Adicionar Novo Cartão</DialogTitle>
                 <DialogDescription>
-                  Preencha os dados do cartão para adicionar ao estoque
+                  Cole a linha de dados ou preencha manualmente
                 </DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
+                {/* Quick Input */}
+                <div className="space-y-2 p-4 rounded-lg bg-red-500/10 border border-red-500/20">
+                  <Label htmlFor="quickInput" className="text-red-400 font-medium">
+                    Entrada Rápida
+                  </Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="quickInput"
+                      placeholder="CARD|MM|YYYY|CVV|NOME:XXX|CPF:XXX|NASC:XX/XX/XXXX"
+                      value={quickInput}
+                      onChange={(e) => setQuickInput(e.target.value)}
+                      className="bg-secondary border-border font-mono text-sm"
+                    />
+                    <Button 
+                      type="button"
+                      variant="outline"
+                      onClick={() => parseQuickInput(quickInput)}
+                      className="border-red-500/50 text-red-400 hover:bg-red-500/10"
+                    >
+                      Importar
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Ex: 5122151090356778|10|2033|512|NOME:ANA SILVA|CPF:12345678900|NASC:28/10/1971
+                  </p>
+                </div>
+
+                <div className="border-t border-border pt-4">
+                  <p className="text-xs text-muted-foreground mb-4">Ou preencha manualmente:</p>
+                </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="fullCard">Número do Cartão</Label>
