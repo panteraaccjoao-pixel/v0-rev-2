@@ -4,18 +4,6 @@ import type { NextRequest } from "next/server"
 // Simple in-memory rate limiter for middleware
 const ipRequestCounts = new Map<string, { count: number; resetTime: number }>()
 
-// Clean up periodically
-if (typeof setInterval !== "undefined") {
-  setInterval(() => {
-    const now = Date.now()
-    for (const [key, entry] of ipRequestCounts.entries()) {
-      if (now > entry.resetTime) {
-        ipRequestCounts.delete(key)
-      }
-    }
-  }, 60000)
-}
-
 function getClientIP(request: NextRequest): string {
   const forwardedFor = request.headers.get("x-forwarded-for")
   if (forwardedFor) {
@@ -32,6 +20,13 @@ function checkGlobalRateLimit(ip: string): { allowed: boolean; remaining: number
   const now = Date.now()
   const windowMs = 60000 // 1 minute
   const maxRequests = 100 // 100 requests per minute per IP
+
+  // Clean up expired entries on each check (lazy cleanup)
+  for (const [key, entry] of ipRequestCounts.entries()) {
+    if (now > entry.resetTime) {
+      ipRequestCounts.delete(key)
+    }
+  }
 
   let entry = ipRequestCounts.get(ip)
 
