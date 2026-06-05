@@ -127,14 +127,13 @@ export default function UsuariosPage() {
     if (!selectedUser) return
     setUpdating(true)
     try {
-      const newAmount = parseFloat(newBalance) - selectedUser.balance
       const res = await fetch("/api/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
-          action: "update_balance", 
+          action: "set_balance", 
           userId: selectedUser.id,
-          amount: newAmount
+          balance: parseFloat(newBalance)
         })
       })
       if (res.ok) {

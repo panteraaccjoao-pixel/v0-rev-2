@@ -7,7 +7,7 @@ let users: User[] = [
     name: "Conta Teste",
     email: "teste@teste.com",
     createdAt: new Date().toISOString(),
-    balance: 999,
+    balance: 0,
     totalSpent: 0,
     purchases: 0,
     status: "active"
@@ -67,6 +67,16 @@ export async function POST(request: NextRequest) {
       }
 
       user.balance += data.amount || 0
+      return NextResponse.json({ success: true, user })
+    }
+
+    if (data.action === "set_balance") {
+      const user = users.find(u => u.id === data.userId || u.email === data.email)
+      if (!user) {
+        return NextResponse.json({ error: "User not found" }, { status: 404 })
+      }
+
+      user.balance = data.balance || 0
       return NextResponse.json({ success: true, user })
     }
 
