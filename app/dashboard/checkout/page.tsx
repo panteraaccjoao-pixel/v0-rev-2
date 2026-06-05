@@ -1,12 +1,13 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { ArrowLeft, Shield, Ticket, ShoppingCart, CreditCard } from "lucide-react"
+import { ArrowLeft, Shield, Ticket, ShoppingCart, CreditCard, Copy, Check, Loader2, QrCode } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import Link from "next/link"
+import Image from "next/image"
 
 interface CartItem {
   id: string
@@ -23,6 +24,14 @@ interface AppliedCoupon {
   type: "percent" | "fixed"
 }
 
+interface PixPayment {
+  id: string
+  amount: number
+  pixCode: string
+  qrCodeUrl: string
+  expiresAt: string
+}
+
 export default function CheckoutPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -32,16 +41,18 @@ export default function CheckoutPage() {
   const [couponError, setCouponError] = useState("")
   const [couponLoading, setCouponLoading] = useState(false)
   const [processing, setProcessing] = useState(false)
+  const [pixPayment, setPixPayment] = useState<PixPayment | null>(null)
+  const [copied, setCopied] = useState(false)
+  const [paymentStatus, setPaymentStatus] = useState<"pending" | "paid" | "expired">("pending")
+  const [timeLeft, setTimeLeft] = useState<string>("")
 
   useEffect(() => {
-    // Get cart data from URL params or localStorage
     const cartData = searchParams.get("cart")
     if (cartData) {
       try {
         const parsed = JSON.parse(decodeURIComponent(cartData))
         setCartItems(parsed)
       } catch {
-        // Fallback to localStorage
         const stored = localStorage.getItem("checkout_cart")
         if (stored) {
           setCartItems(JSON.parse(stored))
@@ -55,6 +66,61 @@ export default function CheckoutPage() {
     }
   }, [searchParams])
 
+  // Poll for payment status
+  const checkPaymentStatus = useCallback(async () => {
+    if (!pixPayment) return
+
+    try {
+      const res = await fetch(`/api/pix?id=${pixPayment.id}`)
+      const data = await res.json()
+      
+      if (data.status === "paid") {
+        setPaymentStatus("paid")
+        // Clear cart and redirect after 2 seconds
+        setTimeout(() => {
+          localStorage.removeItem("checkout_cart")
+          router.push("/dashboard/compras")
+        }, 2000)
+      } else if (data.status === "expired") {
+        setPaymentStatus("expired")
+      }
+    } catch (error) {
+      console.error("Error checking payment:", error)
+    }
+  }, [pixPayment, router])
+
+  useEffect(() => {
+    if (pixPayment && paymentStatus === "pending") {
+      const interval = setInterval(checkPaymentStatus, 5000) // Check every 5 seconds
+      return () => clearInterval(interval)
+    }
+  }, [pixPayment, paymentStatus, checkPaymentStatus])
+
+  // Countdown timer
+  useEffect(() => {
+    if (pixPayment && paymentStatus === "pending") {
+      const updateTimer = () => {
+        const now = new Date().getTime()
+        const expiry = new Date(pixPayment.expiresAt).getTime()
+        const diff = expiry - now
+
+        if (diff <= 0) {
+          setTimeLeft("Expirado")
+          setPaymentStatus("expired")
+          return
+        }
+
+        const minutes = Math.floor(diff / (1000 * 60))
+        const seconds = Math.floor((diff % (1000 * 60)) / 1000)
+        setTimeLeft(`${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`)
+      }
+
+      updateTimer()
+      const interval = setInterval(updateTimer, 1000)
+      return () => clearInterval(interval)
+    }
+  }, [pixPayment, paymentStatus])
+
   const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
   
   const discountAmount = appliedCoupon 
@@ -64,7 +130,6 @@ export default function CheckoutPage() {
     : 0
 
   const total = subtotal - discountAmount
-
   const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0)
 
   const handleApplyCoupon = async () => {
@@ -118,10 +183,28 @@ export default function CheckoutPage() {
         })
       }
 
-      // TODO: Process payment and complete purchase
-      alert("Compra finalizada com sucesso!")
-      localStorage.removeItem("checkout_cart")
-      router.push("/dashboard/compras")
+      // Create PIX payment
+      const res = await fetch("/api/pix", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount: total,
+          items: cartItems.map(item => ({
+            level: item.level,
+            brand: item.brand,
+            quantity: item.quantity,
+            price: item.price
+          }))
+        })
+      })
+
+      const data = await res.json()
+
+      if (data.success) {
+        setPixPayment(data.payment)
+      } else {
+        alert("Erro ao gerar PIX")
+      }
     } catch {
       alert("Erro ao finalizar compra")
     } finally {
@@ -129,7 +212,47 @@ export default function CheckoutPage() {
     }
   }
 
-  if (cartItems.length === 0) {
+  const handleCopyPixCode = async () => {
+    if (!pixPayment) return
+    
+    try {
+      await navigator.clipboard.writeText(pixPayment.pixCode)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 3000)
+    } catch {
+      // Fallback for older browsers
+      const textArea = document.createElement("textarea")
+      textArea.value = pixPayment.pixCode
+      document.body.appendChild(textArea)
+      textArea.select()
+      document.execCommand("copy")
+      document.body.removeChild(textArea)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 3000)
+    }
+  }
+
+  // Simulate payment (for testing)
+  const handleSimulatePayment = async () => {
+    if (!pixPayment) return
+    
+    try {
+      await fetch("/api/pix", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: pixPayment.id, action: "confirm" })
+      })
+      setPaymentStatus("paid")
+      setTimeout(() => {
+        localStorage.removeItem("checkout_cart")
+        router.push("/dashboard/compras")
+      }, 2000)
+    } catch {
+      console.error("Error simulating payment")
+    }
+  }
+
+  if (cartItems.length === 0 && !pixPayment) {
     return (
       <div className="min-h-screen bg-background p-6">
         <Link 
@@ -148,6 +271,142 @@ export default function CheckoutPage() {
             <Button asChild>
               <Link href="/dashboard/comprar">Ver produtos</Link>
             </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  // PIX Payment Screen
+  if (pixPayment) {
+    return (
+      <div className="min-h-screen bg-background p-6">
+        <Link 
+          href="/dashboard/comprar"
+          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-8"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Voltar a loja
+        </Link>
+
+        <Card className="max-w-lg mx-auto bg-card border-border">
+          <CardContent className="p-6 space-y-6">
+            {paymentStatus === "paid" ? (
+              // Payment Success
+              <div className="flex flex-col items-center justify-center py-8">
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/20 mb-4">
+                  <Check className="h-8 w-8 text-emerald-500" />
+                </div>
+                <h2 className="text-2xl font-bold text-emerald-500 mb-2">Pagamento Confirmado!</h2>
+                <p className="text-muted-foreground text-center">
+                  Sua compra foi processada com sucesso. Redirecionando...
+                </p>
+              </div>
+            ) : paymentStatus === "expired" ? (
+              // Payment Expired
+              <div className="flex flex-col items-center justify-center py-8">
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-red-500/20 mb-4">
+                  <QrCode className="h-8 w-8 text-red-500" />
+                </div>
+                <h2 className="text-2xl font-bold text-red-500 mb-2">PIX Expirado</h2>
+                <p className="text-muted-foreground text-center mb-6">
+                  O tempo para pagamento expirou. Gere um novo PIX.
+                </p>
+                <Button onClick={() => {
+                  setPixPayment(null)
+                  setPaymentStatus("pending")
+                }}>
+                  Tentar Novamente
+                </Button>
+              </div>
+            ) : (
+              // Pending Payment
+              <>
+                <div className="text-center">
+                  <h1 className="text-2xl font-bold mb-2">Pagamento via PIX</h1>
+                  <p className="text-muted-foreground">
+                    Escaneie o QR Code ou copie o codigo PIX
+                  </p>
+                </div>
+
+                {/* Timer */}
+                <div className="flex items-center justify-center gap-2 text-amber-500">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span className="font-mono font-semibold">Expira em: {timeLeft}</span>
+                </div>
+
+                {/* QR Code */}
+                <div className="flex justify-center">
+                  <div className="rounded-xl bg-white p-4">
+                    <Image
+                      src={pixPayment.qrCodeUrl}
+                      alt="QR Code PIX"
+                      width={200}
+                      height={200}
+                      className="rounded-lg"
+                    />
+                  </div>
+                </div>
+
+                {/* Amount */}
+                <div className="text-center">
+                  <p className="text-sm text-muted-foreground">Valor a pagar</p>
+                  <p className="text-3xl font-bold text-accent">
+                    R$ {pixPayment.amount.toFixed(2).replace(".", ",")}
+                  </p>
+                </div>
+
+                {/* Copy PIX Code */}
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-center">PIX Copia e Cola</p>
+                  <div className="relative">
+                    <Input
+                      value={pixPayment.pixCode}
+                      readOnly
+                      className="pr-24 bg-secondary border-border font-mono text-xs"
+                    />
+                    <Button
+                      size="sm"
+                      className={`absolute right-1 top-1/2 -translate-y-1/2 ${copied ? "bg-emerald-600" : ""}`}
+                      onClick={handleCopyPixCode}
+                    >
+                      {copied ? (
+                        <>
+                          <Check className="h-4 w-4 mr-1" />
+                          Copiado
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-4 w-4 mr-1" />
+                          Copiar
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Waiting for Payment */}
+                <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Aguardando pagamento...</span>
+                </div>
+
+                {/* Security Footer */}
+                <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                  <Shield className="h-4 w-4" />
+                  <span>Pagamento seguro via PIX</span>
+                </div>
+
+                {/* Simulate Payment Button (for testing) */}
+                <Button 
+                  variant="outline" 
+                  className="w-full border-dashed"
+                  onClick={handleSimulatePayment}
+                >
+                  Simular Pagamento (Teste)
+                </Button>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -296,7 +555,7 @@ export default function CheckoutPage() {
             disabled={processing}
           >
             <ShoppingCart className="mr-2 h-5 w-5" />
-            {processing ? "Processando..." : "Finalizar Compra"}
+            {processing ? "Gerando PIX..." : "Finalizar Compra"}
           </Button>
 
           {/* Security Footer */}
