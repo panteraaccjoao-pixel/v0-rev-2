@@ -365,8 +365,8 @@ export default function CheckoutPage() {
     )
   }
 
-  // PIX Payment Screen
-  if (pixPayment) {
+  // PIX Payment Screen OR Free Delivery Screen
+  if (pixPayment || paymentStatus === "paid") {
     return (
       <div className="min-h-screen bg-background p-6">
         <Link 
@@ -601,8 +601,8 @@ export default function CheckoutPage() {
                   Tentar Novamente
                 </Button>
               </div>
-            ) : (
-              // Pending Payment
+            ) : pixPayment ? (
+              // Pending Payment - Show QR Code
               <>
                 <div className="text-center">
                   <h1 className="text-2xl font-bold mb-2">Pagamento via PIX</h1>
@@ -688,7 +688,7 @@ export default function CheckoutPage() {
                   Simular Pagamento (Teste)
                 </Button>
               </>
-            )}
+            ) : null}
           </CardContent>
         </Card>
       </div>
