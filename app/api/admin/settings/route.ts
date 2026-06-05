@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server"
 let adminSettings = {
   discordAuthUrl: "",
   discordEnabled: true,
+  discordServerUrl: "",
   siteName: "REV SYSTEM",
   maintenanceMode: false
 }

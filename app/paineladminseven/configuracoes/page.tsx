@@ -28,6 +28,7 @@ const configSections = [
 
 export default function ConfiguracoesPage() {
   const [discordAuthUrl, setDiscordAuthUrl] = useState("")
+  const [discordServerUrl, setDiscordServerUrl] = useState("")
   const [discordEnabled, setDiscordEnabled] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -38,6 +39,7 @@ export default function ConfiguracoesPage() {
       .then(res => res.json())
       .then(data => {
         setDiscordAuthUrl(data.discordAuthUrl || "")
+        setDiscordServerUrl(data.discordServerUrl || "")
         setDiscordEnabled(data.discordEnabled ?? true)
       })
       .catch(console.error)
@@ -49,7 +51,7 @@ export default function ConfiguracoesPage() {
       const res = await fetch("/api/admin/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ discordAuthUrl, discordEnabled })
+        body: JSON.stringify({ discordAuthUrl, discordServerUrl, discordEnabled })
       })
       
       if (res.ok) {
@@ -143,6 +145,32 @@ export default function ConfiguracoesPage() {
             </div>
             <p className="text-xs text-muted-foreground">
               Cole aqui o link OAuth do Discord para autenticacao de membros. Os usuarios serao redirecionados para este link ao clicar em &quot;Vincular Discord&quot;.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="discordServerUrl">Link do Servidor Discord</Label>
+            <div className="flex gap-2">
+              <Input
+                id="discordServerUrl"
+                placeholder="https://discord.gg/seu-servidor"
+                value={discordServerUrl}
+                onChange={(e) => setDiscordServerUrl(e.target.value)}
+                className="bg-secondary border-border font-mono text-sm"
+              />
+              {discordServerUrl && (
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => window.open(discordServerUrl, "_blank")}
+                  title="Testar link"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Link de convite do seu servidor Discord. Sera exibido no botao &quot;Entrar no Discord&quot; no footer do site.
             </p>
           </div>
 
