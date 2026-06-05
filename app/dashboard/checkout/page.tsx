@@ -264,6 +264,15 @@ export default function CheckoutPage() {
         })
       }
 
+      // If total is 0, deliver cards immediately without PIX
+      if (total <= 0) {
+        setPaymentStatus("paid")
+        fetchDeliveredCards()
+        localStorage.removeItem("checkout_cart")
+        setProcessing(false)
+        return
+      }
+
       // Create PIX payment
       const res = await fetch("/api/pix", {
         method: "POST",
