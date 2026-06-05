@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { useRouter } from "next/navigation"
 import { CreditCard, Search, ChevronDown, ShoppingCart, Check, Grid3X3, X, Plus, Minus, Trash2 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -51,6 +52,7 @@ interface CartItem {
 }
 
 export default function ComprarCartoesPage() {
+  const router = useRouter()
   const [searchTerm, setSearchTerm] = useState("")
   const [nivel, setNivel] = useState("Nível")
   const [bandeira, setBandeira] = useState("Bandeira")
@@ -683,8 +685,18 @@ export default function ComprarCartoesPage() {
                 <Button 
                   className="w-full bg-red-600 hover:bg-red-700"
                   onClick={() => {
-                    // TODO: Implement batch purchase
-                    alert("Funcionalidade de compra em lote em desenvolvimento")
+                    // Save cart to localStorage and redirect to checkout
+                    const checkoutItems = cart.map(item => ({
+                      id: item.product.products?.[0]?.id || `item_${Date.now()}`,
+                      level: item.product.level,
+                      brand: item.product.brand,
+                      bin: item.product.bin,
+                      price: item.product.price,
+                      quantity: item.quantity
+                    }))
+                    localStorage.setItem("checkout_cart", JSON.stringify(checkoutItems))
+                    setShowCart(false)
+                    router.push("/dashboard/checkout")
                   }}
                 >
                   Finalizar Compra

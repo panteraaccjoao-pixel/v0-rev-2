@@ -70,6 +70,29 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, cupom: newCupom })
     }
 
+    if (action === "validate" && data.code) {
+      const cupom = cupons.find(c => c.code === data.code.toUpperCase() && c.status === "ativo")
+      if (cupom) {
+        // Check expiry
+        if (cupom.expiry && new Date(cupom.expiry) < new Date()) {
+          return NextResponse.json({ valid: false, error: "Cupom expirado" }, { status: 400 })
+        }
+        // Check max uses
+        if (cupom.maxUses && cupom.uses >= cupom.maxUses) {
+          return NextResponse.json({ valid: false, error: "Cupom esgotado" }, { status: 400 })
+        }
+        return NextResponse.json({ 
+          valid: true, 
+          cupom: {
+            code: cupom.code,
+            discount: cupom.discount,
+            type: cupom.type
+          }
+        })
+      }
+      return NextResponse.json({ valid: false, error: "Cupom invalido" }, { status: 400 })
+    }
+
     if (action === "use" && data.code) {
       const cupom = cupons.find(c => c.code === data.code.toUpperCase() && c.status === "ativo")
       if (cupom) {
