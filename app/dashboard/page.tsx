@@ -9,7 +9,8 @@ import {
   X,
   ChevronRight,
   Star,
-  Sparkles
+  Sparkles,
+  Wallet
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -26,6 +27,7 @@ export default function DashboardPage() {
   const [showDiscordBanner, setShowDiscordBanner] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [recentSales, setRecentSales] = useState<RecentSale[]>([])
+  const [userBalance, setUserBalance] = useState(0)
 
   const fetchRecentSales = useCallback(async () => {
     try {
@@ -44,6 +46,19 @@ export default function DashboardPage() {
     
     // Poll for updates every 3 seconds
     const interval = setInterval(fetchRecentSales, 3000)
+    
+    // Fetch user balance from session
+    const session = localStorage.getItem("user_session")
+    if (session) {
+      try {
+        const data = JSON.parse(session)
+        const userData = data.user || data
+        setUserBalance(userData?.balance || 0)
+      } catch {
+        // Ignore parse errors
+      }
+    }
+    
     return () => clearInterval(interval)
   }, [fetchRecentSales])
 
@@ -128,7 +143,19 @@ export default function DashboardPage() {
         </div>
 
         {/* Stats Cards */}
-        <div className="mb-6 grid gap-4 md:grid-cols-3">
+        <div className="mb-6 grid gap-4 md:grid-cols-4">
+          {/* Saldo */}
+          <div className="rounded-lg border border-accent/30 bg-accent/5 p-4">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold uppercase tracking-wider text-accent">Saldo</p>
+              <Wallet className="h-4 w-4 text-accent" />
+            </div>
+            <p className="mt-2 text-3xl font-bold text-accent">
+              R$ {userBalance.toFixed(2).replace('.', ',')}
+            </p>
+            <p className="text-sm text-muted-foreground">Disponível</p>
+          </div>
+
           {/* Compras */}
           <div className="rounded-lg border border-border bg-card p-4">
             <div className="flex items-center justify-between">
