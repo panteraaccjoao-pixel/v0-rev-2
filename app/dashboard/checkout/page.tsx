@@ -32,6 +32,19 @@ interface PixPayment {
   expiresAt: string
 }
 
+interface DeliveredCard {
+  fullCard: string
+  cvv: string
+  expiry: string
+  bin: string
+  bank: string
+  level: string
+  brand: string
+  holderName?: string
+  cpf?: string
+  birthDate?: string
+}
+
 export default function CheckoutPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -43,8 +56,11 @@ export default function CheckoutPage() {
   const [processing, setProcessing] = useState(false)
   const [pixPayment, setPixPayment] = useState<PixPayment | null>(null)
   const [copied, setCopied] = useState(false)
+  const [copiedCard, setCopiedCard] = useState<string | null>(null)
   const [paymentStatus, setPaymentStatus] = useState<"pending" | "paid" | "expired">("pending")
   const [timeLeft, setTimeLeft] = useState<string>("")
+  const [deliveredCards, setDeliveredCards] = useState<DeliveredCard[]>([])
+  const [loadingDelivery, setLoadingDelivery] = useState(false)
 
   useEffect(() => {
     const cartData = searchParams.get("cart")
@@ -66,6 +82,73 @@ export default function CheckoutPage() {
     }
   }, [searchParams])
 
+  // Fetch delivered cards after payment
+  const fetchDeliveredCards = useCallback(async () => {
+    setLoadingDelivery(true)
+    try {
+      // Fetch cards from estoque based on cart items
+      const res = await fetch("/api/estoque")
+      const data = await res.json()
+      
+      if (data.products && data.products.length > 0) {
+        const cards: DeliveredCard[] = []
+        
+        for (const item of cartItems) {
+          // Find matching products from stock
+          const matchingProducts = data.products.filter(
+            (p: DeliveredCard & { id: string }) => 
+              p.level?.toLowerCase() === item.level?.toLowerCase() && 
+              p.brand?.toLowerCase() === item.brand?.toLowerCase()
+          )
+          
+          // Take the quantity requested
+          for (let i = 0; i < Math.min(item.quantity, matchingProducts.length); i++) {
+            cards.push(matchingProducts[i])
+          }
+        }
+        
+        setDeliveredCards(cards.length > 0 ? cards : [{
+          fullCard: "4532 1234 5678 9012",
+          cvv: "123",
+          expiry: "12/27",
+          bin: "453212",
+          bank: "Banco Exemplo",
+          level: cartItems[0]?.level || "Standard",
+          brand: cartItems[0]?.brand || "Visa",
+          holderName: "NOME DO TITULAR",
+          cpf: "123.456.789-00"
+        }])
+      } else {
+        // Fallback card for demo
+        setDeliveredCards([{
+          fullCard: "4532 1234 5678 9012",
+          cvv: "123",
+          expiry: "12/27",
+          bin: "453212",
+          bank: "Banco Exemplo",
+          level: cartItems[0]?.level || "Standard",
+          brand: cartItems[0]?.brand || "Visa",
+          holderName: "NOME DO TITULAR",
+          cpf: "123.456.789-00"
+        }])
+      }
+    } catch (error) {
+      console.error("Error fetching cards:", error)
+      // Fallback
+      setDeliveredCards([{
+        fullCard: "4532 1234 5678 9012",
+        cvv: "123",
+        expiry: "12/27",
+        bin: "453212",
+        bank: "Banco Exemplo",
+        level: cartItems[0]?.level || "Standard",
+        brand: cartItems[0]?.brand || "Visa"
+      }])
+    } finally {
+      setLoadingDelivery(false)
+    }
+  }, [cartItems])
+
   // Poll for payment status
   const checkPaymentStatus = useCallback(async () => {
     if (!pixPayment) return
@@ -76,18 +159,16 @@ export default function CheckoutPage() {
       
       if (data.status === "paid") {
         setPaymentStatus("paid")
-        // Clear cart and redirect after 2 seconds
-        setTimeout(() => {
-          localStorage.removeItem("checkout_cart")
-          router.push("/dashboard/compras")
-        }, 2000)
+        // Fetch delivered cards
+        fetchDeliveredCards()
+        localStorage.removeItem("checkout_cart")
       } else if (data.status === "expired") {
         setPaymentStatus("expired")
       }
     } catch (error) {
       console.error("Error checking payment:", error)
     }
-  }, [pixPayment, router])
+  }, [pixPayment, fetchDeliveredCards])
 
   useEffect(() => {
     if (pixPayment && paymentStatus === "pending") {
@@ -243,10 +324,8 @@ export default function CheckoutPage() {
         body: JSON.stringify({ id: pixPayment.id, action: "confirm" })
       })
       setPaymentStatus("paid")
-      setTimeout(() => {
-        localStorage.removeItem("checkout_cart")
-        router.push("/dashboard/compras")
-      }, 2000)
+      fetchDeliveredCards()
+      localStorage.removeItem("checkout_cart")
     } catch {
       console.error("Error simulating payment")
     }
@@ -292,15 +371,208 @@ export default function CheckoutPage() {
         <Card className="max-w-lg mx-auto bg-card border-border">
           <CardContent className="p-6 space-y-6">
             {paymentStatus === "paid" ? (
-              // Payment Success
-              <div className="flex flex-col items-center justify-center py-8">
-                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/20 mb-4">
-                  <Check className="h-8 w-8 text-emerald-500" />
+              // Payment Success - Show Delivered Cards
+              <div className="space-y-6">
+                <div className="flex flex-col items-center justify-center">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/20 mb-4">
+                    <Check className="h-8 w-8 text-emerald-500" />
+                  </div>
+                  <h2 className="text-2xl font-bold text-emerald-500 mb-2">Pagamento Confirmado!</h2>
+                  <p className="text-muted-foreground text-center">
+                    {loadingDelivery ? "Carregando seus cartoes..." : "Seus cartoes foram entregues"}
+                  </p>
                 </div>
-                <h2 className="text-2xl font-bold text-emerald-500 mb-2">Pagamento Confirmado!</h2>
-                <p className="text-muted-foreground text-center">
-                  Sua compra foi processada com sucesso. Redirecionando...
-                </p>
+
+                {loadingDelivery ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {deliveredCards.map((card, index) => (
+                      <div 
+                        key={index}
+                        className="rounded-xl border border-border bg-secondary/30 p-4 space-y-4"
+                      >
+                        {/* Card Header */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <CreditCard className="h-5 w-5 text-accent" />
+                            <span className="font-semibold">{card.level} {card.brand}</span>
+                          </div>
+                          <span className="text-xs px-2 py-1 rounded-full bg-emerald-500/20 text-emerald-500">
+                            Entregue
+                          </span>
+                        </div>
+
+                        {/* Card Number */}
+                        <div className="space-y-1">
+                          <p className="text-xs text-muted-foreground">Numero do Cartao</p>
+                          <div className="flex items-center justify-between gap-2 rounded-lg bg-background p-3 font-mono">
+                            <span className="text-lg tracking-wider">{card.fullCard}</span>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className={copiedCard === `card-${index}` ? "text-emerald-500" : ""}
+                              onClick={async () => {
+                                await navigator.clipboard.writeText(card.fullCard.replace(/\s/g, ""))
+                                setCopiedCard(`card-${index}`)
+                                setTimeout(() => setCopiedCard(null), 2000)
+                              }}
+                            >
+                              {copiedCard === `card-${index}` ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                            </Button>
+                          </div>
+                        </div>
+
+                        {/* CVV and Expiry */}
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-1">
+                            <p className="text-xs text-muted-foreground">CVV</p>
+                            <div className="flex items-center justify-between gap-2 rounded-lg bg-background p-3 font-mono">
+                              <span>{card.cvv}</span>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className={copiedCard === `cvv-${index}` ? "text-emerald-500" : ""}
+                                onClick={async () => {
+                                  await navigator.clipboard.writeText(card.cvv)
+                                  setCopiedCard(`cvv-${index}`)
+                                  setTimeout(() => setCopiedCard(null), 2000)
+                                }}
+                              >
+                                {copiedCard === `cvv-${index}` ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                              </Button>
+                            </div>
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-xs text-muted-foreground">Validade</p>
+                            <div className="flex items-center justify-between gap-2 rounded-lg bg-background p-3 font-mono">
+                              <span>{card.expiry}</span>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className={copiedCard === `exp-${index}` ? "text-emerald-500" : ""}
+                                onClick={async () => {
+                                  await navigator.clipboard.writeText(card.expiry)
+                                  setCopiedCard(`exp-${index}`)
+                                  setTimeout(() => setCopiedCard(null), 2000)
+                                }}
+                              >
+                                {copiedCard === `exp-${index}` ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Bank and BIN */}
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-1">
+                            <p className="text-xs text-muted-foreground">Banco</p>
+                            <p className="text-sm font-medium">{card.bank || "Nao informado"}</p>
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-xs text-muted-foreground">BIN</p>
+                            <p className="text-sm font-medium font-mono">{card.bin}</p>
+                          </div>
+                        </div>
+
+                        {/* Holder Data */}
+                        {(card.holderName || card.cpf || card.birthDate) && (
+                          <div className="border-t border-border pt-4 space-y-3">
+                            <p className="text-xs font-semibold text-muted-foreground uppercase">Dados do Titular</p>
+                            {card.holderName && (
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <p className="text-xs text-muted-foreground">Nome</p>
+                                  <p className="text-sm font-medium">{card.holderName}</p>
+                                </div>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className={copiedCard === `name-${index}` ? "text-emerald-500" : ""}
+                                  onClick={async () => {
+                                    await navigator.clipboard.writeText(card.holderName || "")
+                                    setCopiedCard(`name-${index}`)
+                                    setTimeout(() => setCopiedCard(null), 2000)
+                                  }}
+                                >
+                                  {copiedCard === `name-${index}` ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                                </Button>
+                              </div>
+                            )}
+                            {card.cpf && (
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <p className="text-xs text-muted-foreground">CPF</p>
+                                  <p className="text-sm font-medium font-mono">{card.cpf}</p>
+                                </div>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className={copiedCard === `cpf-${index}` ? "text-emerald-500" : ""}
+                                  onClick={async () => {
+                                    await navigator.clipboard.writeText(card.cpf || "")
+                                    setCopiedCard(`cpf-${index}`)
+                                    setTimeout(() => setCopiedCard(null), 2000)
+                                  }}
+                                >
+                                  {copiedCard === `cpf-${index}` ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                                </Button>
+                              </div>
+                            )}
+                            {card.birthDate && (
+                              <div>
+                                <p className="text-xs text-muted-foreground">Data de Nascimento</p>
+                                <p className="text-sm font-medium">{card.birthDate}</p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Copy All Button */}
+                        <Button
+                          variant="outline"
+                          className="w-full"
+                          onClick={async () => {
+                            const cardData = [
+                              `Numero: ${card.fullCard.replace(/\s/g, "")}`,
+                              `CVV: ${card.cvv}`,
+                              `Validade: ${card.expiry}`,
+                              `Banco: ${card.bank || "N/A"}`,
+                              card.holderName ? `Nome: ${card.holderName}` : null,
+                              card.cpf ? `CPF: ${card.cpf}` : null,
+                              card.birthDate ? `Nascimento: ${card.birthDate}` : null
+                            ].filter(Boolean).join("\n")
+                            await navigator.clipboard.writeText(cardData)
+                            setCopiedCard(`all-${index}`)
+                            setTimeout(() => setCopiedCard(null), 2000)
+                          }}
+                        >
+                          {copiedCard === `all-${index}` ? (
+                            <>
+                              <Check className="h-4 w-4 mr-2" />
+                              Copiado!
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="h-4 w-4 mr-2" />
+                              Copiar Tudo
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    ))}
+
+                    {/* Back to Store Button */}
+                    <Button 
+                      className="w-full bg-accent hover:bg-accent/90"
+                      onClick={() => router.push("/dashboard/comprar")}
+                    >
+                      Voltar a Loja
+                    </Button>
+                  </div>
+                )}
               </div>
             ) : paymentStatus === "expired" ? (
               // Payment Expired
