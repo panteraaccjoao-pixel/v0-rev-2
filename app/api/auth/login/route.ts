@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
       return rateLimitResponse(rateLimit.resetIn)
     }
 
-    const { email, password } = await request.json()
+    const { email, password, discordId } = await request.json()
     
     // Validate input
     if (!email || !password) {
@@ -89,7 +89,8 @@ export async function POST(request: NextRequest) {
         deviceType,
         browser,
         os,
-        success: true
+        success: true,
+        discordId: discordId || undefined
       })
       
       const response = NextResponse.json({
@@ -124,7 +125,8 @@ export async function POST(request: NextRequest) {
       deviceType,
       browser,
       os,
-      success: false
+      success: false,
+      discordId: discordId || undefined
     })
 
     return NextResponse.json({

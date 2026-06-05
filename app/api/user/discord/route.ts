@@ -23,56 +23,35 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { discordUsername, discordId: providedDiscordId } = body
+    const { discordId } = body
     const userId = request.headers.get("x-user-id") || "anonymous"
     
-    // If discordId is provided directly (from OAuth callback)
-    if (providedDiscordId) {
-      userDiscordLinks.set(userId, {
-        discordId: providedDiscordId,
-        discordUsername: discordUsername || `User#${providedDiscordId.substring(0, 4)}`,
-        linkedAt: new Date().toISOString()
-      })
-
-      return NextResponse.json({
-        success: true,
-        message: "Discord vinculado com sucesso",
-        discordId: providedDiscordId,
-        discordUsername: discordUsername || `User#${providedDiscordId.substring(0, 4)}`,
-        linkedAt: new Date().toISOString()
-      })
-    }
-    
-    if (!discordUsername || discordUsername.trim() === "") {
+    if (!discordId || discordId.trim() === "") {
       return NextResponse.json(
-        { error: "Username do Discord é obrigatório" },
+        { error: "ID do Discord é obrigatório" },
         { status: 400 }
       )
     }
 
-    // Validate Discord username format (username or username#0000)
-    const usernameRegex = /^.{2,32}(#\d{4})?$/
-    if (!usernameRegex.test(discordUsername.trim())) {
+    // Validate Discord ID format (should be a numeric string, 17-19 digits)
+    const idRegex = /^\d{17,19}$/
+    if (!idRegex.test(discordId.trim())) {
       return NextResponse.json(
-        { error: "Formato de username inválido" },
+        { error: "ID do Discord inválido. O ID deve ter entre 17 e 19 dígitos numéricos." },
         { status: 400 }
       )
     }
-
-    // Generate a mock Discord ID
-    const discordId = Math.random().toString(36).substring(2, 20)
     
     userDiscordLinks.set(userId, {
-      discordId,
-      discordUsername: discordUsername.trim(),
+      discordId: discordId.trim(),
+      discordUsername: "",
       linkedAt: new Date().toISOString()
     })
 
     return NextResponse.json({
       success: true,
       message: "Discord vinculado com sucesso",
-      discordId,
-      discordUsername: discordUsername.trim(),
+      discordId: discordId.trim(),
       linkedAt: new Date().toISOString()
     })
   } catch {

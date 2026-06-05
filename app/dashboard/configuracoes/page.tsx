@@ -20,7 +20,7 @@ interface AdminSettings {
 
 export default function ConfiguracoesPage() {
   const [discordData, setDiscordData] = useState<DiscordData>({ linked: false })
-  const [discordUsername, setDiscordUsername] = useState("")
+  const [discordId, setDiscordId] = useState("")
   const [isLinkingDiscord, setIsLinkingDiscord] = useState(false)
   const [discordError, setDiscordError] = useState("")
   const [discordSuccess, setDiscordSuccess] = useState("")
@@ -109,9 +109,9 @@ export default function ConfiguracoesPage() {
       return
     }
 
-    // Fallback to manual username input
-    if (!discordUsername.trim()) {
-      setDiscordError("Digite seu username do Discord")
+    // Fallback to manual ID input
+    if (!discordId.trim()) {
+      setDiscordError("Digite seu ID do Discord")
       return
     }
 
@@ -123,7 +123,7 @@ export default function ConfiguracoesPage() {
       const res = await fetch("/api/user/discord", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ discordUsername: discordUsername.trim() })
+        body: JSON.stringify({ discordId: discordId.trim() })
       })
 
       const data = await res.json()
@@ -139,7 +139,7 @@ export default function ConfiguracoesPage() {
         discordUsername: data.discordUsername,
         linkedAt: data.linkedAt
       })
-      setDiscordUsername("")
+      setDiscordId("")
       setDiscordSuccess("Discord vinculado com sucesso!")
       setTimeout(() => setDiscordSuccess(""), 3000)
     } catch {
@@ -292,15 +292,15 @@ export default function ConfiguracoesPage() {
                 </Button>
               </div>
             ) : (
-              // No OAuth URL - fallback to manual input
-              <div className="space-y-2">
-                <Label htmlFor="discord-username">Username do Discord</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="discord-username"
-                    placeholder="seu_username"
-                    value={discordUsername}
-                    onChange={(e) => setDiscordUsername(e.target.value)}
+                    // No OAuth URL - fallback to manual input
+                    <div className="space-y-2">
+                      <Label htmlFor="discord-id">ID do Discord</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          id="discord-id"
+                          placeholder="123456789012345678"
+                          value={discordId}
+                          onChange={(e) => setDiscordId(e.target.value)}
                     className="flex-1"
                   />
                   <Button
@@ -314,9 +314,9 @@ export default function ConfiguracoesPage() {
                     Vincular
                   </Button>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Digite seu username do Discord para receber notificações de drops, promoções e atualizações.
-                </p>
+                      <p className="text-xs text-muted-foreground">
+                        Digite seu ID do Discord para receber notificações. Para encontrar seu ID, ative o Modo Desenvolvedor nas configurações do Discord.
+                      </p>
               </div>
             )}
           </div>

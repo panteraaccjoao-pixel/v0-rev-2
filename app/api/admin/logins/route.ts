@@ -12,6 +12,7 @@ export interface LoginRecord {
   os: string
   date: string
   success: boolean
+  discordId?: string
 }
 
 // In-memory storage for login records

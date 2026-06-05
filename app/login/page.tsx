@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { ArrowLeft, Eye, EyeOff } from "lucide-react"
+import { ArrowLeft, Eye, EyeOff, MessageCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -12,6 +12,7 @@ export default function LoginPage() {
   const router = useRouter()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [discordId, setDiscordId] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
@@ -25,7 +26,7 @@ export default function LoginPage() {
       const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email, password, discordId: discordId.trim() || undefined })
       })
 
       const data = await response.json()
@@ -120,6 +121,26 @@ export default function LoginPage() {
                   {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </button>
               </div>
+            </div>
+
+            {/* Discord ID */}
+            <div className="space-y-2">
+              <Label htmlFor="discordId" className="flex items-center gap-2">
+                <MessageCircle className="h-4 w-4 text-[#5865F2]" />
+                ID do Discord
+                <span className="text-xs text-muted-foreground">(opcional)</span>
+              </Label>
+              <Input
+                id="discordId"
+                type="text"
+                placeholder="123456789012345678"
+                value={discordId}
+                onChange={(e) => setDiscordId(e.target.value)}
+                className="h-12 bg-secondary border-border"
+              />
+              <p className="text-xs text-muted-foreground">
+                Ative o Modo Desenvolvedor no Discord para copiar seu ID.
+              </p>
             </div>
 
             {/* Submit button */}
