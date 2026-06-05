@@ -47,9 +47,9 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  // Group products by level and brand for client view
+  // Group products by BIN, level and brand for client view
   const grouped = filteredProducts.reduce((acc, product) => {
-    const key = `${product.level}-${product.brand}`
+    const key = `${product.bin}-${product.level}-${product.brand}`
     if (!acc[key]) {
       acc[key] = {
         level: product.level,
