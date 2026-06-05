@@ -1,7 +1,27 @@
+"use client"
+
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { Zap } from "lucide-react"
 
 export function Footer() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+
+  useEffect(() => {
+    // Check if user is authenticated
+    const checkAuth = () => {
+      const authCookie = document.cookie
+        .split("; ")
+        .find((row) => row.startsWith("rev_auth="))
+      setIsAuthenticated(!!authCookie)
+    }
+    
+    checkAuth()
+    // Listen for storage changes (login/logout)
+    window.addEventListener("storage", checkAuth)
+    return () => window.removeEventListener("storage", checkAuth)
+  }, [])
+
   return (
     <footer className="border-t border-border bg-background">
       <div className="mx-auto max-w-7xl px-4 py-12 md:px-6">
@@ -19,30 +39,32 @@ export function Footer() {
             </div>
           </div>
           
-          {/* Navigation */}
-          <div className="space-y-4">
-            <h4 className="text-sm font-semibold text-foreground">Navegação</h4>
-            <nav className="flex flex-col gap-2">
-              <Link 
-                href="/dashboard" 
-                className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-              >
-                Dashboard
-              </Link>
-              <Link 
-                href="/comprar" 
-                className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-              >
-                Comprar Cartões
-              </Link>
-              <Link 
-                href="/recarregar" 
-                className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-              >
-                Recarregar Saldo
-              </Link>
-            </nav>
-          </div>
+          {/* Navigation - Only show if authenticated */}
+          {isAuthenticated && (
+            <div className="space-y-4">
+              <h4 className="text-sm font-semibold text-foreground">Navegação</h4>
+              <nav className="flex flex-col gap-2">
+                <Link 
+                  href="/dashboard" 
+                  className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  Dashboard
+                </Link>
+                <Link 
+                  href="/dashboard/comprar" 
+                  className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  Comprar Cartões
+                </Link>
+                <Link 
+                  href="/dashboard/recarregar" 
+                  className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  Recarregar Saldo
+                </Link>
+              </nav>
+            </div>
+          )}
           
           {/* Help */}
           <div className="space-y-4">
