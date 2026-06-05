@@ -114,6 +114,43 @@ export default function CheckoutPage() {
     }
   }, [cartItems])
 
+  // Process purchase: deduct balance and remove from stock
+  const processPurchase = useCallback(async (cards: (DeliveredCard & { id?: string })[]) => {
+    try {
+      // 1. Deduct balance from user
+      const totalAmount = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+      const discountAmount = appliedCoupon 
+        ? (appliedCoupon.type === "percent" 
+            ? totalAmount * (appliedCoupon.discount / 100) 
+            : appliedCoupon.discount)
+        : 0
+      const finalAmount = Math.max(0, totalAmount - discountAmount)
+      
+      if (finalAmount > 0) {
+        await fetch("/api/users", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "update_balance",
+            email: "teste@teste.com",
+            amount: -finalAmount
+          })
+        })
+      }
+
+      // 2. Remove products from stock
+      for (const card of cards) {
+        if (card.id) {
+          await fetch(`/api/estoque?id=${card.id}`, {
+            method: "DELETE"
+          })
+        }
+      }
+    } catch (error) {
+      console.error("Error processing purchase:", error)
+    }
+  }, [cartItems, appliedCoupon])
+
   // Fetch delivered cards after payment
   const fetchDeliveredCards = useCallback(async () => {
     setLoadingDelivery(true)
@@ -151,7 +188,8 @@ export default function CheckoutPage() {
           cpf: "123.456.789-00"
         }]
         setDeliveredCards(finalCards)
-        // Create order for each card
+        // Process purchase and create order
+        await processPurchase(finalCards)
         await createOrder(finalCards)
       } else {
         // Fallback card for demo
@@ -167,6 +205,7 @@ export default function CheckoutPage() {
           cpf: "123.456.789-00"
         }]
         setDeliveredCards(fallbackCards)
+        await processPurchase(fallbackCards)
         await createOrder(fallbackCards)
       }
     } catch (error) {
@@ -182,11 +221,12 @@ export default function CheckoutPage() {
         brand: cartItems[0]?.brand || "Visa"
       }]
       setDeliveredCards(fallbackCards)
+      await processPurchase(fallbackCards)
       await createOrder(fallbackCards)
     } finally {
       setLoadingDelivery(false)
     }
-  }, [cartItems, createOrder])
+  }, [cartItems, createOrder, processPurchase])
 
   // Poll for payment status
   const checkPaymentStatus = useCallback(async () => {
