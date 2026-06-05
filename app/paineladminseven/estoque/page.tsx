@@ -108,7 +108,10 @@ export default function EstoquePage() {
     birthDate: ""
   })
 
-  // Parse quick input format: CARD|MM|YYYY|CVV|NOME:XXX|CPF:XXX|NASC:XX/XX/XXXX
+  // Parse quick input format: 
+  // Format 1: CARD|MM|YYYY|CVV|NOME:XXX|CPF:XXX|NASC:XX/XX/XXXX
+  // Format 2: CARD|MM|YYYY|CVV|CPF|NOME
+  // Format 3: CARD|MM|YYYY|CVV|CPF|NOME|NASC
   const parseQuickInput = (input: string) => {
     const parts = input.split("|")
     if (parts.length < 4) return
@@ -118,19 +121,32 @@ export default function EstoquePage() {
     const year = parts[2]?.trim() || ""
     const cvv = parts[3]?.trim() || ""
     
-    // Parse additional data (NOME:, CPF:, NASC:)
     let holderName = ""
     let cpf = ""
     let birthDate = ""
     
+    // Check remaining parts for data
     for (let i = 4; i < parts.length; i++) {
       const part = parts[i]?.trim() || ""
+      
+      // Check if it has a prefix (NOME:, CPF:, NASC:)
       if (part.toUpperCase().startsWith("NOME:")) {
         holderName = part.substring(5).trim()
       } else if (part.toUpperCase().startsWith("CPF:")) {
         cpf = part.substring(4).trim()
       } else if (part.toUpperCase().startsWith("NASC:")) {
         birthDate = part.substring(5).trim()
+      } 
+      // Auto-detect without prefix
+      else if (/^\d{11}$/.test(part)) {
+        // 11 digits = CPF
+        cpf = part
+      } else if (/^\d{2}\/\d{2}\/\d{4}$/.test(part)) {
+        // DD/MM/YYYY = birth date
+        birthDate = part
+      } else if (/^[A-Za-zÀ-ÿ\s]+$/.test(part) && part.length > 3) {
+        // Letters and spaces = name
+        holderName = part
       }
     }
     
