@@ -1,31 +1,32 @@
 import { NextRequest, NextResponse } from "next/server"
-
-// In-memory user balances (replace with database in production)
-const userBalances = new Map<string, number>()
-
-// Initialize test user
-userBalances.set("teste@teste.com", 999)
+import { users } from "@/app/api/users/route"
 
 export function getUserBalance(email: string): number {
-  return userBalances.get(email) ?? 0
+  const user = users.find(u => u.email === email)
+  return user?.balance ?? 0
 }
 
 export function setUserBalance(email: string, balance: number): void {
-  userBalances.set(email, balance)
+  const user = users.find(u => u.email === email)
+  if (user) {
+    user.balance = balance
+  }
 }
 
 export function deductBalance(email: string, amount: number): boolean {
-  const currentBalance = getUserBalance(email)
-  if (currentBalance >= amount) {
-    userBalances.set(email, currentBalance - amount)
+  const user = users.find(u => u.email === email)
+  if (user && user.balance >= amount) {
+    user.balance -= amount
     return true
   }
   return false
 }
 
 export function addBalance(email: string, amount: number): void {
-  const currentBalance = getUserBalance(email)
-  userBalances.set(email, currentBalance + amount)
+  const user = users.find(u => u.email === email)
+  if (user) {
+    user.balance += amount
+  }
 }
 
 export async function GET(request: NextRequest) {
@@ -35,7 +36,8 @@ export async function GET(request: NextRequest) {
                       request.headers.get("x-user-email") || 
                       "teste@teste.com"
     
-    const balance = getUserBalance(userEmail)
+    const user = users.find(u => u.email === userEmail)
+    const balance = user?.balance ?? 0
     
     return NextResponse.json({
       balance,
@@ -61,25 +63,31 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const user = users.find(u => u.email === email)
+    if (!user) {
+      return NextResponse.json(
+        { error: "Usuário não encontrado" },
+        { status: 404 }
+      )
+    }
+
     if (operation === "add") {
-      addBalance(email, amount)
+      user.balance += amount
     } else if (operation === "deduct") {
-      const success = deductBalance(email, amount)
-      if (!success) {
+      if (user.balance < amount) {
         return NextResponse.json(
           { error: "Saldo insuficiente" },
           { status: 400 }
         )
       }
+      user.balance -= amount
     } else if (operation === "set") {
-      setUserBalance(email, amount)
+      user.balance = amount
     }
-
-    const newBalance = getUserBalance(email)
     
     return NextResponse.json({
       success: true,
-      balance: newBalance,
+      balance: user.balance,
       email
     })
   } catch {
