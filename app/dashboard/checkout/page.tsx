@@ -530,21 +530,27 @@ export default function CheckoutPage() {
                           </div>
                         )}
 
-                        {/* Copy All Button */}
+                        {/* Copy All Button - Formatted with pipes */}
                         <Button
                           variant="outline"
                           className="w-full"
                           onClick={async () => {
-                            const cardData = [
-                              `Numero: ${card.fullCard.replace(/\s/g, "")}`,
-                              `CVV: ${card.cvv}`,
-                              `Validade: ${card.expiry}`,
-                              `Banco: ${card.bank || "N/A"}`,
-                              card.holderName ? `Nome: ${card.holderName}` : null,
-                              card.cpf ? `CPF: ${card.cpf}` : null,
-                              card.birthDate ? `Nascimento: ${card.birthDate}` : null
-                            ].filter(Boolean).join("\n")
-                            await navigator.clipboard.writeText(cardData)
+                            // Format: numero|mes|ano|cvv|cpf|nome
+                            const [month, year] = (card.expiry || "00/00").split("/")
+                            const fullYear = year?.length === 2 ? `20${year}` : year
+                            const cpfClean = (card.cpf || "").replace(/[.\-]/g, "")
+                            const cardNumber = card.fullCard.replace(/\s/g, "")
+                            
+                            const formattedData = [
+                              cardNumber,
+                              month,
+                              fullYear,
+                              card.cvv,
+                              cpfClean || "",
+                              card.holderName || ""
+                            ].join("|")
+                            
+                            await navigator.clipboard.writeText(formattedData)
                             setCopiedCard(`all-${index}`)
                             setTimeout(() => setCopiedCard(null), 2000)
                           }}
