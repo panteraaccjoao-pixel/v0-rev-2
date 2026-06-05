@@ -38,12 +38,9 @@ function generateQRCodeUrl(pixCode: string): string {
 // POST - Create new PIX payment
 export async function POST(request: NextRequest) {
   try {
-    // Validate secret key is configured
-    if (!PIX_SECRET_KEY) {
-      console.error("[PIX] Secret key not configured")
-      return NextResponse.json({ error: "Configuracao de pagamento invalida" }, { status: 500 })
-    }
-
+    // PIX_SECRET_KEY is optional - will be used when integrating with real payment gateway
+    // For now, we generate mock PIX codes for testing
+    
     const data = await request.json()
     const { amount, items } = data
 
