@@ -1,7 +1,11 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import Link from "next/link"
-import { Database, CreditCard, Settings, ChevronRight } from "lucide-react"
+import { Database, CreditCard, Settings, ChevronRight, MessageCircle, Save, ExternalLink } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 
 const configSections = [
   {
@@ -23,6 +27,42 @@ const configSections = [
 ]
 
 export default function ConfiguracoesPage() {
+  const [discordAuthUrl, setDiscordAuthUrl] = useState("")
+  const [discordEnabled, setDiscordEnabled] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+
+  useEffect(() => {
+    // Load settings
+    fetch("/api/admin/settings")
+      .then(res => res.json())
+      .then(data => {
+        setDiscordAuthUrl(data.discordAuthUrl || "")
+        setDiscordEnabled(data.discordEnabled ?? true)
+      })
+      .catch(console.error)
+  }, [])
+
+  const handleSaveDiscord = async () => {
+    setSaving(true)
+    try {
+      const res = await fetch("/api/admin/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ discordAuthUrl, discordEnabled })
+      })
+      
+      if (res.ok) {
+        setSaved(true)
+        setTimeout(() => setSaved(false), 3000)
+      }
+    } catch (error) {
+      console.error("Error saving:", error)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <div className="space-y-8">
       <div>
@@ -49,6 +89,80 @@ export default function ConfiguracoesPage() {
             <ChevronRight className="h-5 w-5 text-muted-foreground" />
           </Link>
         ))}
+      </div>
+
+      {/* Discord Integration Section */}
+      <div className="rounded-lg border border-border bg-card p-6">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-500/10">
+            <MessageCircle className="h-5 w-5 text-indigo-500" />
+          </div>
+          <div>
+            <h2 className="font-semibold">Integracao Discord</h2>
+            <p className="text-sm text-muted-foreground">Configure a autenticacao de membros do Discord</p>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div className="flex items-center justify-between py-3 border-b border-border">
+            <div>
+              <p className="font-medium">Vincular Discord Ativo</p>
+              <p className="text-sm text-muted-foreground">Permite usuarios vincularem Discord</p>
+            </div>
+            <label className="relative inline-flex cursor-pointer items-center">
+              <input 
+                type="checkbox" 
+                className="peer sr-only" 
+                checked={discordEnabled}
+                onChange={(e) => setDiscordEnabled(e.target.checked)}
+              />
+              <div className="h-6 w-11 rounded-full bg-secondary peer-checked:bg-indigo-500 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:bg-white after:transition-all peer-checked:after:translate-x-full"></div>
+            </label>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="discordUrl">URL de Autenticacao Discord (OAuth)</Label>
+            <div className="flex gap-2">
+              <Input
+                id="discordUrl"
+                placeholder="https://discord.com/api/oauth2/authorize?client_id=..."
+                value={discordAuthUrl}
+                onChange={(e) => setDiscordAuthUrl(e.target.value)}
+                className="bg-secondary border-border font-mono text-sm"
+              />
+              {discordAuthUrl && (
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => window.open(discordAuthUrl, "_blank")}
+                  title="Testar link"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Cole aqui o link OAuth do Discord para autenticacao de membros. Os usuarios serao redirecionados para este link ao clicar em &quot;Vincular Discord&quot;.
+            </p>
+          </div>
+
+          <Button 
+            onClick={handleSaveDiscord} 
+            disabled={saving}
+            className="w-full bg-indigo-600 hover:bg-indigo-700"
+          >
+            {saving ? (
+              "Salvando..."
+            ) : saved ? (
+              "Salvo com sucesso!"
+            ) : (
+              <>
+                <Save className="h-4 w-4 mr-2" />
+                Salvar Configuracoes Discord
+              </>
+            )}
+          </Button>
+        </div>
       </div>
 
       <div className="rounded-lg border border-border bg-card p-6">

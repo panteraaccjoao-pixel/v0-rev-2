@@ -23,8 +23,25 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { discordUsername } = body
+    const { discordUsername, discordId: providedDiscordId } = body
     const userId = request.headers.get("x-user-id") || "anonymous"
+    
+    // If discordId is provided directly (from OAuth callback)
+    if (providedDiscordId) {
+      userDiscordLinks.set(userId, {
+        discordId: providedDiscordId,
+        discordUsername: discordUsername || `User#${providedDiscordId.substring(0, 4)}`,
+        linkedAt: new Date().toISOString()
+      })
+
+      return NextResponse.json({
+        success: true,
+        message: "Discord vinculado com sucesso",
+        discordId: providedDiscordId,
+        discordUsername: discordUsername || `User#${providedDiscordId.substring(0, 4)}`,
+        linkedAt: new Date().toISOString()
+      })
+    }
     
     if (!discordUsername || discordUsername.trim() === "") {
       return NextResponse.json(

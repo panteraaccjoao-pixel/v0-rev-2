@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { User, Shield, Palette, LogOut, MessageCircle, Check, X, Loader2 } from "lucide-react"
+import { User, Shield, Palette, LogOut, MessageCircle, Check, X, Loader2, ExternalLink } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -13,16 +13,47 @@ interface DiscordData {
   linkedAt?: string
 }
 
+interface AdminSettings {
+  discordAuthUrl: string
+  discordEnabled: boolean
+}
+
 export default function ConfiguracoesPage() {
   const [discordData, setDiscordData] = useState<DiscordData>({ linked: false })
   const [discordUsername, setDiscordUsername] = useState("")
   const [isLinkingDiscord, setIsLinkingDiscord] = useState(false)
   const [discordError, setDiscordError] = useState("")
   const [discordSuccess, setDiscordSuccess] = useState("")
+  const [adminSettings, setAdminSettings] = useState<AdminSettings>({ discordAuthUrl: "", discordEnabled: true })
 
   useEffect(() => {
     fetchDiscordStatus()
+    fetchAdminSettings()
+    
+    // Check for Discord callback
+    const urlParams = new URLSearchParams(window.location.search)
+    const discordId = urlParams.get("discord_id")
+    const discordUser = urlParams.get("discord_username")
+    
+    if (discordId && discordUser) {
+      // User returned from Discord auth
+      handleDiscordCallback(discordId, discordUser)
+      // Clean URL
+      window.history.replaceState({}, "", window.location.pathname)
+    }
   }, [])
+
+  const fetchAdminSettings = async () => {
+    try {
+      const res = await fetch("/api/admin/settings")
+      if (res.ok) {
+        const data = await res.json()
+        setAdminSettings(data)
+      }
+    } catch (error) {
+      console.error("Error fetching admin settings:", error)
+    }
+  }
 
   const fetchDiscordStatus = async () => {
     try {
@@ -36,7 +67,49 @@ export default function ConfiguracoesPage() {
     }
   }
 
+  const handleDiscordCallback = async (discordId: string, discordUsername: string) => {
+    setIsLinkingDiscord(true)
+    try {
+      const res = await fetch("/api/user/discord", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ discordId, discordUsername })
+      })
+
+      const data = await res.json()
+
+      if (res.ok) {
+        setDiscordData({
+          linked: true,
+          discordId: data.discordId,
+          discordUsername: data.discordUsername,
+          linkedAt: data.linkedAt
+        })
+        setDiscordSuccess("Discord vinculado com sucesso!")
+        setTimeout(() => setDiscordSuccess(""), 3000)
+      } else {
+        setDiscordError(data.error || "Erro ao vincular Discord")
+      }
+    } catch {
+      setDiscordError("Erro ao vincular Discord")
+    } finally {
+      setIsLinkingDiscord(false)
+    }
+  }
+
   const handleLinkDiscord = async () => {
+    // If there's an OAuth URL configured, redirect to it
+    if (adminSettings.discordAuthUrl) {
+      // Add return URL for callback
+      const returnUrl = encodeURIComponent(window.location.href)
+      const authUrl = adminSettings.discordAuthUrl.includes("?") 
+        ? `${adminSettings.discordAuthUrl}&state=${returnUrl}`
+        : `${adminSettings.discordAuthUrl}?state=${returnUrl}`
+      window.location.href = authUrl
+      return
+    }
+
+    // Fallback to manual username input
     if (!discordUsername.trim()) {
       setDiscordError("Digite seu username do Discord")
       return
@@ -197,33 +270,59 @@ export default function ConfiguracoesPage() {
               Desvincular Discord
             </Button>
           </div>
-        ) : (
+        ) : adminSettings.discordEnabled ? (
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="discord-username">Username do Discord</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="discord-username"
-                  placeholder="seu_username"
-                  value={discordUsername}
-                  onChange={(e) => setDiscordUsername(e.target.value)}
-                  className="flex-1"
-                />
+            {adminSettings.discordAuthUrl ? (
+              // OAuth URL configured - show button to redirect
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Clique no botão abaixo para autenticar sua conta do Discord e vincular ao seu perfil.
+                </p>
                 <Button
                   onClick={handleLinkDiscord}
                   disabled={isLinkingDiscord}
-                  className="bg-[#5865F2] text-white hover:bg-[#5865F2]/90"
+                  className="w-full bg-[#5865F2] text-white hover:bg-[#5865F2]/90"
                 >
                   {isLinkingDiscord ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : null}
-                  Vincular
+                  ) : (
+                    <ExternalLink className="mr-2 h-4 w-4" />
+                  )}
+                  Vincular Discord
                 </Button>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Digite seu username do Discord para receber notificações de drops, promoções e atualizações.
-              </p>
-            </div>
+            ) : (
+              // No OAuth URL - fallback to manual input
+              <div className="space-y-2">
+                <Label htmlFor="discord-username">Username do Discord</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="discord-username"
+                    placeholder="seu_username"
+                    value={discordUsername}
+                    onChange={(e) => setDiscordUsername(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Button
+                    onClick={handleLinkDiscord}
+                    disabled={isLinkingDiscord}
+                    className="bg-[#5865F2] text-white hover:bg-[#5865F2]/90"
+                  >
+                    {isLinkingDiscord ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : null}
+                    Vincular
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Digite seu username do Discord para receber notificações de drops, promoções e atualizações.
+                </p>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="text-center py-4 text-muted-foreground">
+            <p>Vinculação com Discord está desativada no momento.</p>
           </div>
         )}
       </div>
