@@ -32,6 +32,9 @@ interface PixPayment {
   expiresAt: string
 }
 
+// Public key for frontend (can be exposed)
+const PIX_PUBLIC_KEY = process.env.NEXT_PUBLIC_PIX_PUBLIC_KEY
+
 export default function CheckoutPage() {
   const router = useRouter()
   const searchParams = useSearchParams()

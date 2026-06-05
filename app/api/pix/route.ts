@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 
+// Get secret key from environment (used for API authentication)
+const PIX_SECRET_KEY = process.env.PIX_SECRET_KEY
+
 // In-memory storage for PIX payments
 interface PixPayment {
   id: string
@@ -35,6 +38,12 @@ function generateQRCodeUrl(pixCode: string): string {
 // POST - Create new PIX payment
 export async function POST(request: NextRequest) {
   try {
+    // Validate secret key is configured
+    if (!PIX_SECRET_KEY) {
+      console.error("[PIX] Secret key not configured")
+      return NextResponse.json({ error: "Configuracao de pagamento invalida" }, { status: 500 })
+    }
+
     const data = await request.json()
     const { amount, items } = data
 
