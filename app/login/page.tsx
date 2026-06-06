@@ -28,13 +28,18 @@ export default function LoginPage() {
         body: JSON.stringify({ email, password })
       })
 
-      const data = await response.json()
+      const data = await response.json().catch(() => null)
 
-      if (data.success) {
+      if (response.ok && data?.success) {
         localStorage.setItem("user_session", JSON.stringify(data))
         router.push("/dashboard")
+        return
+      }
+
+      if (response.status === 429) {
+        setError(data?.error || "Muitas tentativas. Aguarde alguns minutos e tente novamente.")
       } else {
-        setError(data.message || "Email ou senha incorretos")
+        setError(data?.message || data?.error || "Email ou senha incorretos")
       }
     } catch (err) {
       setError("Erro ao fazer login. Tente novamente.")
