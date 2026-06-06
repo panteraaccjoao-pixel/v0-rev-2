@@ -2,6 +2,7 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { cookies } from "next/headers"
+import QRCode from "qrcode"
 
 // Gateway URLs by provider
 const GATEWAY_URLS: Record<string, { sandbox: string; production: string }> = {
@@ -69,7 +70,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Fallback: Generate static PIX (for testing without gateway)
-    const pixData = generateStaticPix({
+    const pixData = await generateStaticPix({
       amount,
       txId: `REV${Date.now()}`,
       pixKey: config?.pixKey || "",
@@ -297,7 +298,7 @@ async function genericGatewayCreatePix({ amount, userId, userEmail, config, base
 }
 
 // Generate static PIX code (EMV format) - fallback when no gateway
-function generateStaticPix({
+async function generateStaticPix({
   amount,
   txId,
   pixKey,
@@ -320,8 +321,17 @@ function generateStaticPix({
     txId,
   })
 
-  // Generate QR code as base64 (placeholder - in production use a QR library)
-  const qrCodeBase64 = "" // You would use a library like 'qrcode' to generate this
+  // Generate QR code as base64 data URL from the EMV payload
+  let qrCodeBase64 = ""
+  try {
+    qrCodeBase64 = await QRCode.toDataURL(payload, {
+      width: 300,
+      margin: 1,
+      errorCorrectionLevel: "M",
+    })
+  } catch (err) {
+    console.error("Error generating QR code:", err)
+  }
 
   return {
     pixCode: payload,
