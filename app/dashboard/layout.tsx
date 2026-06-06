@@ -53,14 +53,23 @@ export default function DashboardLayout({
   const pathname = usePathname()
   const router = useRouter()
   const [user, setUser] = useState<{ name: string; email: string } | null>(null)
+  const [checkingAuth, setCheckingAuth] = useState(true)
   const [discordServerUrl, setDiscordServerUrl] = useState("")
 
   useEffect(() => {
-    const session = localStorage.getItem("user_session")
+    let session: string | null = null
+    try {
+      session = localStorage.getItem("user_session")
+    } catch {
+      session = null
+    }
+
     if (!session) {
-      router.push("/login")
+      setCheckingAuth(false)
+      router.replace("/login")
       return
     }
+
     try {
       const data = JSON.parse(session)
       // Handle both formats: { user: {...} } or { name, email }
@@ -70,7 +79,9 @@ export default function DashboardLayout({
         email: userData?.email || "" 
       })
     } catch {
-      router.push("/login")
+      router.replace("/login")
+    } finally {
+      setCheckingAuth(false)
     }
 
     // Fetch Discord server URL
@@ -91,8 +102,11 @@ export default function DashboardLayout({
 
   if (!user) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-accent border-t-transparent" />
+        <p className="text-sm text-muted-foreground">
+          {checkingAuth ? "Carregando..." : "Redirecionando para o login..."}
+        </p>
       </div>
     )
   }
