@@ -461,9 +461,9 @@ export default function RecarregarPage() {
           <p className="mb-3 text-sm font-medium text-muted-foreground">Ou ajuste o valor</p>
           <Slider
             min={10}
-            max={500}
+            max={1000}
             step={5}
-            value={[Math.min(Math.max(getFinalValue() || 10, 10), 500)]}
+            value={[Math.min(Math.max(getFinalValue() || 10, 10), 1000)]}
             onValueChange={(vals) => {
               setRechargeValue(vals[0])
               setCustomValue("")
@@ -473,7 +473,7 @@ export default function RecarregarPage() {
           />
           <div className="mt-2 flex justify-between text-sm text-muted-foreground">
             <span>R$ 10</span>
-            <span>R$ 500</span>
+            <span>R$ 1.000</span>
           </div>
         </div>
 
