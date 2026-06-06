@@ -471,22 +471,6 @@ export default function RecarregarPage() {
           <p className="mt-2 text-sm text-muted-foreground">Valor minimo: R$ 5,00</p>
         </div>
 
-        {/* Payment Method */}
-        <div className="mb-6">
-          <p className="mb-3 text-sm font-medium text-muted-foreground">Metodo de pagamento</p>
-          <div className="rounded-lg border-2 border-accent bg-accent/10 p-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent/20">
-                <QrCode className="h-5 w-5 text-accent" />
-              </div>
-              <div>
-                <p className="font-semibold text-foreground">PIX</p>
-                <p className="text-sm text-muted-foreground">Pagamento instantaneo</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
         {/* Generate PIX Button */}
         {error && (
           <div className="mb-4 rounded-lg border border-red-500/50 bg-red-500/10 px-4 py-3 text-sm text-red-500">
