@@ -1,9 +1,9 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import { ArrowLeft, Eye, EyeOff, Check } from "lucide-react"
+import { ArrowLeft, Eye, EyeOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -19,30 +19,11 @@ export default function RegisterPage() {
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
 
-  // Simple security verification (math challenge)
-  const [num1, setNum1] = useState(0)
-  const [num2, setNum2] = useState(0)
-  const [captchaAnswer, setCaptchaAnswer] = useState("")
-
-  useEffect(() => {
-    setNum1(Math.floor(Math.random() * 10) + 1)
-    setNum2(Math.floor(Math.random() * 10) + 1)
-  }, [])
-
-  const regenerateCaptcha = () => {
-    setNum1(Math.floor(Math.random() * 10) + 1)
-    setNum2(Math.floor(Math.random() * 10) + 1)
-    setCaptchaAnswer("")
-  }
-
-  const captchaValid = captchaAnswer !== "" && parseInt(captchaAnswer) === num1 + num2
-
   const isFormValid =
     name.trim() !== "" &&
     email.trim() !== "" &&
     password.length >= 6 &&
-    password === confirmPassword &&
-    captchaValid
+    password === confirmPassword
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -58,10 +39,6 @@ export default function RegisterPage() {
     }
     if (password !== confirmPassword) {
       setError("As senhas não coincidem")
-      return
-    }
-    if (!captchaValid) {
-      setError("Verificação de segurança incorreta")
       return
     }
 
@@ -95,11 +72,9 @@ export default function RegisterPage() {
         router.push("/dashboard")
       } else {
         setError(data.error === "User already exists" ? "Este email já está cadastrado" : "Erro ao criar conta")
-        regenerateCaptcha()
       }
     } catch {
       setError("Erro ao criar conta. Tente novamente.")
-      regenerateCaptcha()
     } finally {
       setLoading(false)
     }
@@ -213,26 +188,6 @@ export default function RegisterPage() {
               {confirmPassword !== "" && password !== confirmPassword && (
                 <p className="text-xs text-red-500">As senhas não coincidem</p>
               )}
-            </div>
-
-            {/* Verificação de segurança (math captcha) */}
-            <div className="space-y-2">
-              <Label htmlFor="captcha">Verificação de segurança</Label>
-              <div className="flex items-center gap-3 rounded-md border border-border bg-secondary p-3">
-                <span className="select-none text-lg font-medium text-foreground">
-                  {num1} + {num2} =
-                </span>
-                <Input
-                  id="captcha"
-                  type="number"
-                  placeholder="?"
-                  value={captchaAnswer}
-                  onChange={(e) => setCaptchaAnswer(e.target.value)}
-                  className="h-10 w-20 bg-background border-border"
-                />
-                {captchaValid && <Check className="h-5 w-5 text-green-500" />}
-              </div>
-              <p className="text-xs text-muted-foreground">Resolva a soma para confirmar que você não é um robô.</p>
             </div>
 
             {/* Submit button */}
