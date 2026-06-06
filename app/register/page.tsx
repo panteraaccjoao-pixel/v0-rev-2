@@ -82,8 +82,8 @@ export default function RegisterPage() {
         return
       }
 
-      // Caso contrário, precisa confirmar o email
-      window.location.href = "/auth/sign-up-success"
+      // Caso contrário, precisa confirmar o email com o código enviado
+      window.location.href = `/auth/verificar?email=${encodeURIComponent(email.trim().toLowerCase())}`
     } catch {
       setError("Erro ao criar conta. Tente novamente.")
     } finally {

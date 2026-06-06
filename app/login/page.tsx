@@ -36,10 +36,11 @@ export default function LoginPage() {
 
       if (signInError) {
         if (signInError.message.toLowerCase().includes("not confirmed")) {
-          setError("Confirme seu email antes de entrar. Verifique sua caixa de entrada.")
-        } else {
-          setError("Email ou senha incorretos")
+          // Conta ainda não confirmada: leva para a verificação por código
+          window.location.href = `/auth/verificar?email=${encodeURIComponent(email.trim().toLowerCase())}`
+          return
         }
+        setError("Email ou senha incorretos")
         return
       }
 
