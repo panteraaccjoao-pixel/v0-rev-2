@@ -57,6 +57,17 @@ export default function DashboardLayout({
   const [discordServerUrl, setDiscordServerUrl] = useState("")
 
   useEffect(() => {
+    const redirectToLogin = () => {
+      setCheckingAuth(false)
+      router.replace("/login")
+      // Fallback: ensure navigation completes even if soft routing is blocked (e.g. preview iframe)
+      setTimeout(() => {
+        if (window.location.pathname.startsWith("/dashboard")) {
+          window.location.href = "/login"
+        }
+      }, 400)
+    }
+
     let session: string | null = null
     try {
       session = localStorage.getItem("user_session")
@@ -65,8 +76,7 @@ export default function DashboardLayout({
     }
 
     if (!session) {
-      setCheckingAuth(false)
-      router.replace("/login")
+      redirectToLogin()
       return
     }
 
@@ -74,14 +84,17 @@ export default function DashboardLayout({
       const data = JSON.parse(session)
       // Handle both formats: { user: {...} } or { name, email }
       const userData = data.user || data
+      if (!userData || (!userData.name && !userData.email)) {
+        redirectToLogin()
+        return
+      }
       setUser({ 
         name: userData?.name || "Usuário", 
         email: userData?.email || "" 
       })
-    } catch {
-      router.replace("/login")
-    } finally {
       setCheckingAuth(false)
+    } catch {
+      redirectToLogin()
     }
 
     // Fetch Discord server URL
