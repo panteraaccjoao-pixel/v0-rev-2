@@ -54,7 +54,11 @@ export default function RecarregarPage() {
   }, [])
 
   const handleCustomValueChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/\D/g, "")
+    let value = e.target.value.replace(/\D/g, "")
+    // Trava o valor máximo em R$ 1.000
+    if (value && parseInt(value) > 1000) {
+      value = "1000"
+    }
     setCustomValue(value)
     setRechargeValue(0)
     setError(null)
