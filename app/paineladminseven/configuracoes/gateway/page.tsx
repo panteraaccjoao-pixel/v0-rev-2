@@ -201,7 +201,7 @@ export default function GatewayPage() {
                 onClick={() => setShowApiKey(!showApiKey)}
                 className="absolute right-1 top-1/2 z-10 -translate-y-1/2 flex h-10 w-10 items-center justify-center text-muted-foreground hover:text-foreground"
               >
-                {showApiKey ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                {showApiKey ? <EyeOff className="h-5 w-5 pointer-events-none" /> : <Eye className="h-5 w-5 pointer-events-none" />}
               </button>
             </div>
           </div>
@@ -223,7 +223,7 @@ export default function GatewayPage() {
                 onClick={() => setShowSecretKey(!showSecretKey)}
                 className="absolute right-1 top-1/2 z-10 -translate-y-1/2 flex h-10 w-10 items-center justify-center text-muted-foreground hover:text-foreground"
               >
-                {showSecretKey ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                {showSecretKey ? <EyeOff className="h-5 w-5 pointer-events-none" /> : <Eye className="h-5 w-5 pointer-events-none" />}
               </button>
             </div>
           </div>
