@@ -18,30 +18,49 @@ export function AdminAuthGuard({ children }: { children: React.ReactNode }) {
       return
     }
 
-    // Check if user is authenticated
-    const session = localStorage.getItem("admin_session")
-    
+    const redirectToLogin = () => {
+      setIsAuthenticated(false)
+      setIsLoading(false)
+      router.replace("/paineladminseven/login")
+      // Fallback: ensure navigation completes even if soft routing is blocked (e.g. preview iframe)
+      setTimeout(() => {
+        if (window.location.pathname.startsWith("/paineladminseven") && window.location.pathname !== "/paineladminseven/login") {
+          window.location.href = "/paineladminseven/login"
+        }
+      }, 400)
+    }
+
+    let session: string | null = null
+    try {
+      session = localStorage.getItem("admin_session")
+    } catch {
+      session = null
+    }
+
     if (!session) {
-      router.push("/paineladminseven/login")
+      redirectToLogin()
       return
     }
 
     try {
       const sessionData = JSON.parse(session)
-      
+
       // Check if session is expired
-      if (sessionData.expiresAt < Date.now()) {
-        localStorage.removeItem("admin_session")
-        router.push("/paineladminseven/login")
+      if (!sessionData.expiresAt || sessionData.expiresAt < Date.now()) {
+        try {
+          localStorage.removeItem("admin_session")
+        } catch {}
+        redirectToLogin()
         return
       }
 
       setIsAuthenticated(true)
-    } catch {
-      localStorage.removeItem("admin_session")
-      router.push("/paineladminseven/login")
-    } finally {
       setIsLoading(false)
+    } catch {
+      try {
+        localStorage.removeItem("admin_session")
+      } catch {}
+      redirectToLogin()
     }
   }, [pathname, router])
 

@@ -37,7 +37,9 @@ export default function AdminLoginPage() {
           email: email,
           expiresAt: Date.now() + (24 * 60 * 60 * 1000) // 24 hours
         }))
-        router.push("/paineladminseven")
+        // Hard navigation ensures it works even inside the preview iframe
+        window.location.href = "/paineladminseven"
+        return
       } else {
         setError(data.message || "Credenciais inválidas")
       }
