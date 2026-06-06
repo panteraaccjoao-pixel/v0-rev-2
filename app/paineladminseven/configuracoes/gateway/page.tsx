@@ -197,8 +197,9 @@ export default function GatewayPage() {
               />
               <button
                 type="button"
+                aria-label={showApiKey ? "Ocultar chave" : "Mostrar chave"}
                 onClick={() => setShowApiKey(!showApiKey)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                className="absolute right-1 top-1/2 z-10 -translate-y-1/2 flex h-10 w-10 items-center justify-center text-muted-foreground hover:text-foreground"
               >
                 {showApiKey ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
               </button>
@@ -218,8 +219,9 @@ export default function GatewayPage() {
               />
               <button
                 type="button"
+                aria-label={showSecretKey ? "Ocultar chave" : "Mostrar chave"}
                 onClick={() => setShowSecretKey(!showSecretKey)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                className="absolute right-1 top-1/2 z-10 -translate-y-1/2 flex h-10 w-10 items-center justify-center text-muted-foreground hover:text-foreground"
               >
                 {showSecretKey ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
               </button>
