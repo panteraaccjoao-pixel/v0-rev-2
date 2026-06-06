@@ -145,6 +145,10 @@ export default function RecarregarPage() {
   const handleGeneratePix = async () => {
     const value = getFinalValue()
     if (value < 5) return
+    if (value > 1000) {
+      setError("O valor máximo para recarga é R$ 1.000,00.")
+      return
+    }
 
     setProcessing(true)
     setError(null)
@@ -490,7 +494,7 @@ export default function RecarregarPage() {
               className="h-14 bg-card pl-12 text-lg"
             />
           </div>
-          <p className="mt-2 text-sm text-muted-foreground">Valor minimo: R$ 5,00</p>
+          <p className="mt-2 text-sm text-muted-foreground">Valor minimo: R$ 5,00 • Valor maximo: R$ 1.000,00</p>
         </div>
 
         {/* Generate PIX Button */}
@@ -501,7 +505,7 @@ export default function RecarregarPage() {
         )}
         <Button
           onClick={handleGeneratePix}
-          disabled={processing || getFinalValue() < 5}
+          disabled={processing || getFinalValue() < 5 || getFinalValue() > 1000}
           className="h-14 w-full bg-emerald-600 text-white hover:bg-emerald-700 text-lg font-semibold"
         >
           {processing ? (
