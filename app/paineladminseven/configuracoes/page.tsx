@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { Database, CreditCard, Settings, ChevronRight, MessageCircle, Save, ExternalLink } from "lucide-react"
+import { Database, CreditCard, Settings, ChevronRight, MessageCircle, Save, ExternalLink, ShieldCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -23,6 +23,14 @@ const configSections = [
     icon: CreditCard,
     color: "text-green-500",
     bgColor: "bg-green-500/10",
+  },
+  {
+    title: "Captcha",
+    description: "Configure as chaves pública e secreta do serviço de captcha (reCAPTCHA, hCaptcha, Turnstile)",
+    href: "/paineladminseven/configuracoes/captcha",
+    icon: ShieldCheck,
+    color: "text-amber-500",
+    bgColor: "bg-amber-500/10",
   },
 ]
 
