@@ -1,10 +1,10 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { ArrowLeft, QrCode, Copy, Check, Loader2 } from "lucide-react"
+import { useState, useEffect, useCallback } from "react"
+import { ArrowLeft, Shield, Copy, Check, Loader2, QrCode, Wallet } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Card, CardContent } from "@/components/ui/card"
 import Link from "next/link"
 import Image from "next/image"
 
@@ -17,37 +17,45 @@ const predefinedValues = [
   { value: 500, label: "R$ 500" },
 ]
 
-interface PixResponse {
-  success: boolean
+interface PixPayment {
+  id: string
+  amount: number
   pixCode: string
-  qrCodeBase64?: string
-  expiresAt?: string
-  txId?: string
-  error?: string
+  qrCodeUrl: string
+  expiresAt: string
 }
 
 export default function RecarregarPage() {
-  const router = useRouter()
   const [rechargeValue, setRechargeValue] = useState<number>(0)
   const [customValue, setCustomValue] = useState("")
-  const [pixData, setPixData] = useState<PixResponse | null>(null)
+  const [pixPayment, setPixPayment] = useState<PixPayment | null>(null)
   const [copied, setCopied] = useState(false)
-  const [loading, setLoading] = useState(false)
+  const [processing, setProcessing] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [currentBalance] = useState(0)
+  const [paymentStatus, setPaymentStatus] = useState<"pending" | "paid" | "expired">("pending")
+  const [timeLeft, setTimeLeft] = useState<string>("")
+  const [currentBalance, setCurrentBalance] = useState(0)
+  const [creditedAmount, setCreditedAmount] = useState(0)
 
-  const handleValueSelect = (value: number) => {
-    // Soma o valor ao invés de substituir
-    setRechargeValue(prev => prev + value)
-    setCustomValue("")
-    setPixCode(null)
-  }
+  // Load current balance
+  useEffect(() => {
+    const loadBalance = async () => {
+      try {
+        const res = await fetch("/api/users")
+        const data = await res.json()
+        const user = data.users?.find((u: { email: string; balance: number }) => u.email === "teste@teste.com")
+        if (user) setCurrentBalance(user.balance)
+      } catch {
+        // ignore
+      }
+    }
+    loadBalance()
+  }, [])
 
   const handleCustomValueChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value.replace(/\D/g, "")
     setCustomValue(value)
     setRechargeValue(0)
-    setPixData(null)
     setError(null)
   }
 
@@ -60,60 +68,325 @@ export default function RecarregarPage() {
   const handleClearValue = () => {
     setRechargeValue(0)
     setCustomValue("")
-    setPixData(null)
     setError(null)
   }
+
+  // Credit balance after payment confirmed
+  const creditBalance = useCallback(async (amount: number) => {
+    try {
+      await fetch("/api/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "update_balance",
+          email: "teste@teste.com",
+          amount: amount,
+        }),
+      })
+      setCreditedAmount(amount)
+      setCurrentBalance((prev) => prev + amount)
+    } catch (err) {
+      console.error("Error crediting balance:", err)
+    }
+  }, [])
+
+  // Poll for payment status
+  const checkPaymentStatus = useCallback(async () => {
+    if (!pixPayment) return
+
+    try {
+      const res = await fetch(`/api/pix?id=${pixPayment.id}`)
+      const data = await res.json()
+
+      if (data.status === "paid") {
+        setPaymentStatus("paid")
+        creditBalance(pixPayment.amount)
+      } else if (data.status === "expired") {
+        setPaymentStatus("expired")
+      }
+    } catch (err) {
+      console.error("Error checking payment:", err)
+    }
+  }, [pixPayment, creditBalance])
+
+  useEffect(() => {
+    if (pixPayment && paymentStatus === "pending") {
+      const interval = setInterval(checkPaymentStatus, 5000)
+      return () => clearInterval(interval)
+    }
+  }, [pixPayment, paymentStatus, checkPaymentStatus])
+
+  // Countdown timer
+  useEffect(() => {
+    if (pixPayment && paymentStatus === "pending") {
+      const updateTimer = () => {
+        const now = new Date().getTime()
+        const expiry = new Date(pixPayment.expiresAt).getTime()
+        const diff = expiry - now
+
+        if (diff <= 0) {
+          setTimeLeft("Expirado")
+          setPaymentStatus("expired")
+          return
+        }
+
+        const minutes = Math.floor(diff / (1000 * 60))
+        const seconds = Math.floor((diff % (1000 * 60)) / 1000)
+        setTimeLeft(`${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`)
+      }
+
+      updateTimer()
+      const interval = setInterval(updateTimer, 1000)
+      return () => clearInterval(interval)
+    }
+  }, [pixPayment, paymentStatus])
 
   const handleGeneratePix = async () => {
     const value = getFinalValue()
     if (value < 5) return
 
-    setLoading(true)
+    setProcessing(true)
     setError(null)
 
     try {
-      // Get user data from session
-      const userSession = localStorage.getItem("user_session")
-      const userData = userSession ? JSON.parse(userSession) : {}
-
-      const response = await fetch("/api/pix/generate", {
+      const res = await fetch("/api/pix", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           amount: value,
-          userId: userData.userId,
-          userEmail: userData.email,
+          items: [{ level: "Recarga", brand: "Saldo", quantity: 1, price: value }],
         }),
       })
 
-      const data: PixResponse = await response.json()
+      const data = await res.json()
 
-      if (data.success && data.pixCode) {
-        setPixData(data)
+      if (data.success) {
+        setPixPayment(data.payment)
       } else {
         setError(data.error || "Erro ao gerar PIX. Tente novamente.")
       }
     } catch (err) {
       console.error("Erro ao gerar PIX:", err)
-      setError("Erro de conexão. Tente novamente.")
+      setError("Erro de conexao. Tente novamente.")
     } finally {
-      setLoading(false)
+      setProcessing(false)
     }
   }
 
-  const handleCopyPix = () => {
-    if (pixData?.pixCode) {
-      navigator.clipboard.writeText(pixData.pixCode)
+  const handleCopyPixCode = async () => {
+    if (!pixPayment) return
+
+    try {
+      await navigator.clipboard.writeText(pixPayment.pixCode)
       setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      setTimeout(() => setCopied(false), 3000)
+    } catch {
+      const textArea = document.createElement("textarea")
+      textArea.value = pixPayment.pixCode
+      document.body.appendChild(textArea)
+      textArea.select()
+      document.execCommand("copy")
+      document.body.removeChild(textArea)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 3000)
     }
   }
 
+  // Simulate payment (for testing)
+  const handleSimulatePayment = async () => {
+    if (!pixPayment) return
+
+    try {
+      await fetch("/api/pix", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: pixPayment.id, action: "confirm" }),
+      })
+      setPaymentStatus("paid")
+      creditBalance(pixPayment.amount)
+    } catch {
+      console.error("Error simulating payment")
+    }
+  }
+
+  const handleNewRecharge = () => {
+    setPixPayment(null)
+    setPaymentStatus("pending")
+    setRechargeValue(0)
+    setCustomValue("")
+    setCreditedAmount(0)
+    setError(null)
+  }
+
+  // PIX Payment Screen OR Success Screen
+  if (pixPayment) {
+    return (
+      <div className="min-h-screen bg-background p-6">
+        <Link
+          href="/dashboard"
+          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-8"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Voltar
+        </Link>
+
+        <Card className="max-w-lg mx-auto bg-card border-border">
+          <CardContent className="p-6 space-y-6">
+            {paymentStatus === "paid" ? (
+              // Payment Success
+              <div className="space-y-6">
+                <div className="flex flex-col items-center justify-center">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/20 mb-4">
+                    <Check className="h-8 w-8 text-emerald-500" />
+                  </div>
+                  <h2 className="text-2xl font-bold text-emerald-500 mb-2">Pagamento Confirmado!</h2>
+                  <p className="text-muted-foreground text-center">
+                    Seu saldo foi recarregado com sucesso
+                  </p>
+                </div>
+
+                <div className="rounded-xl border border-border bg-secondary/30 p-6 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Valor recarregado</span>
+                    <span className="text-xl font-bold text-emerald-500">
+                      + R$ {creditedAmount.toFixed(2).replace(".", ",")}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between border-t border-border pt-4">
+                    <span className="font-semibold">Saldo atual</span>
+                    <span className="text-2xl font-bold text-accent">
+                      R$ {currentBalance.toFixed(2).replace(".", ",")}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <Button variant="outline" onClick={handleNewRecharge}>
+                    Nova recarga
+                  </Button>
+                  <Button asChild className="bg-accent text-accent-foreground hover:bg-accent/90">
+                    <Link href="/dashboard">Ir ao painel</Link>
+                  </Button>
+                </div>
+              </div>
+            ) : paymentStatus === "expired" ? (
+              // Expired
+              <div className="flex flex-col items-center justify-center py-8 space-y-4">
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-red-500/20">
+                  <QrCode className="h-8 w-8 text-red-500" />
+                </div>
+                <h2 className="text-xl font-bold text-red-500">PIX Expirado</h2>
+                <p className="text-muted-foreground text-center">
+                  O tempo para pagamento expirou. Gere um novo codigo PIX.
+                </p>
+                <Button onClick={handleNewRecharge} className="w-full">
+                  Gerar novo PIX
+                </Button>
+              </div>
+            ) : (
+              // Pending Payment
+              <>
+                {/* Header */}
+                <div className="text-center">
+                  <h1 className="text-2xl font-bold">Pague com PIX</h1>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Escaneie o QR Code ou copie o codigo
+                  </p>
+                </div>
+
+                {/* Timer */}
+                {timeLeft && (
+                  <div className="flex items-center justify-center">
+                    <span className="rounded-full bg-secondary px-4 py-1 text-sm font-medium text-muted-foreground">
+                      Expira em {timeLeft}
+                    </span>
+                  </div>
+                )}
+
+                {/* QR Code */}
+                <div className="flex justify-center">
+                  <div className="rounded-xl bg-white p-4">
+                    <Image
+                      src={pixPayment.qrCodeUrl}
+                      alt="QR Code PIX"
+                      width={200}
+                      height={200}
+                      className="rounded-lg"
+                    />
+                  </div>
+                </div>
+
+                {/* Amount */}
+                <div className="text-center">
+                  <p className="text-sm text-muted-foreground">Valor a pagar</p>
+                  <p className="text-3xl font-bold text-accent">
+                    R$ {pixPayment.amount.toFixed(2).replace(".", ",")}
+                  </p>
+                </div>
+
+                {/* Copy PIX Code */}
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-center">PIX Copia e Cola</p>
+                  <div className="relative">
+                    <Input
+                      value={pixPayment.pixCode}
+                      readOnly
+                      className="pr-24 bg-secondary border-border font-mono text-xs"
+                    />
+                    <Button
+                      size="sm"
+                      className={`absolute right-1 top-1/2 -translate-y-1/2 ${copied ? "bg-emerald-600" : ""}`}
+                      onClick={handleCopyPixCode}
+                    >
+                      {copied ? (
+                        <>
+                          <Check className="h-4 w-4 mr-1" />
+                          Copiado
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-4 w-4 mr-1" />
+                          Copiar
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Waiting for Payment */}
+                <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Aguardando pagamento...</span>
+                </div>
+
+                {/* Security Footer */}
+                <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                  <Shield className="h-4 w-4" />
+                  <span>Pagamento seguro via PIX</span>
+                </div>
+
+                {/* Simulate Payment Button (for testing) */}
+                <Button
+                  variant="outline"
+                  className="w-full border-dashed"
+                  onClick={handleSimulatePayment}
+                >
+                  Simular Pagamento (Teste)
+                </Button>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  // Value Selection Screen
   return (
     <div className="min-h-screen bg-background">
       {/* Back Button */}
       <div className="p-4">
-        <Link 
+        <Link
           href="/dashboard"
           className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
         >
@@ -162,16 +435,17 @@ export default function RecarregarPage() {
 
         {/* Predefined Values */}
         <div className="mb-6">
-          <p className="mb-3 text-sm font-medium text-muted-foreground">Valores sugeridos <span className="text-xs">(clique para somar)</span></p>
+          <p className="mb-3 text-sm font-medium text-muted-foreground">
+            Valores sugeridos <span className="text-xs">(clique para somar)</span>
+          </p>
           <div className="grid grid-cols-3 gap-3">
             {predefinedValues.map((item) => (
               <button
                 key={item.value}
                 type="button"
                 onClick={() => {
-                  setRechargeValue(prev => prev + item.value)
+                  setRechargeValue((prev) => prev + item.value)
                   setCustomValue("")
-                  setPixData(null)
                 }}
                 className="rounded-lg border border-border bg-card px-4 py-4 text-center font-semibold transition-all hover:border-accent hover:bg-accent/10 active:scale-95"
               >
@@ -194,12 +468,12 @@ export default function RecarregarPage() {
               className="h-14 bg-card pl-12 text-lg"
             />
           </div>
-          <p className="mt-2 text-sm text-muted-foreground">Valor mínimo: R$ 5,00</p>
+          <p className="mt-2 text-sm text-muted-foreground">Valor minimo: R$ 5,00</p>
         </div>
 
         {/* Payment Method */}
         <div className="mb-6">
-          <p className="mb-3 text-sm font-medium text-muted-foreground">Método de pagamento</p>
+          <p className="mb-3 text-sm font-medium text-muted-foreground">Metodo de pagamento</p>
           <div className="rounded-lg border-2 border-accent bg-accent/10 p-4">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent/20">
@@ -207,124 +481,44 @@ export default function RecarregarPage() {
               </div>
               <div>
                 <p className="font-semibold text-foreground">PIX</p>
-                <p className="text-sm text-muted-foreground">Pagamento instantâneo</p>
+                <p className="text-sm text-muted-foreground">Pagamento instantaneo</p>
               </div>
             </div>
           </div>
         </div>
 
         {/* Generate PIX Button */}
-        {!pixData ? (
-          <>
-            {error && (
-              <div className="mb-4 rounded-lg border border-red-500/50 bg-red-500/10 px-4 py-3 text-sm text-red-500">
-                {error}
-              </div>
-            )}
-            <Button
-              onClick={handleGeneratePix}
-              disabled={loading || getFinalValue() < 5}
-              className="h-14 w-full bg-secondary text-secondary-foreground hover:bg-secondary/80"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Gerando código PIX...
-                </>
-              ) : (
-                "Gerar código PIX"
-              )}
-            </Button>
-          </>
-        ) : (
-          <div className="space-y-4">
-            {/* QR Code Display */}
-            {pixData.qrCodeBase64 && (
-              <div className="flex justify-center rounded-lg bg-white p-6">
-                <Image
-                  src={pixData.qrCodeBase64.startsWith("data:") 
-                    ? pixData.qrCodeBase64 
-                    : `data:image/png;base64,${pixData.qrCodeBase64}`
-                  }
-                  alt="QR Code PIX"
-                  width={200}
-                  height={200}
-                  className="h-48 w-48"
-                />
-              </div>
-            )}
-
-            {/* PIX Code Display */}
-            <div className="rounded-lg bg-card p-4">
-              <p className="mb-2 text-sm font-medium text-muted-foreground">PIX Copia e Cola:</p>
-              <div className="relative">
-                <p className="break-all rounded bg-secondary/50 p-3 pr-12 text-xs text-muted-foreground font-mono">
-                  {pixData.pixCode}
-                </p>
-              </div>
-            </div>
-
-            {/* Copy Button */}
-            <Button
-              onClick={handleCopyPix}
-              className="h-14 w-full gap-2 bg-accent text-accent-foreground hover:bg-accent/90"
-            >
-              {copied ? (
-                <>
-                  <Check className="h-5 w-5" />
-                  Copiado!
-                </>
-              ) : (
-                <>
-                  <Copy className="h-5 w-5" />
-                  Copiar código PIX
-                </>
-              )}
-            </Button>
-
-            {/* Value Summary */}
-            <div className="rounded-lg border border-border bg-card p-4">
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Valor da recarga:</span>
-                <span className="text-xl font-bold text-accent">
-                  R$ {getFinalValue().toFixed(2).replace(".", ",")}
-                </span>
-              </div>
-              {pixData.expiresAt && (
-                <p className="mt-2 text-xs text-muted-foreground">
-                  Expira em: {new Date(pixData.expiresAt).toLocaleTimeString("pt-BR")}
-                </p>
-              )}
-              {pixData.txId && (
-                <p className="mt-1 text-xs text-muted-foreground">
-                  ID: {pixData.txId}
-                </p>
-              )}
-            </div>
-
-            {/* Generate New PIX */}
-            <Button
-              variant="outline"
-              onClick={() => {
-                setPixData(null)
-                setRechargeValue(0)
-                setCustomValue("")
-              }}
-              className="w-full"
-            >
-              Gerar novo PIX
-            </Button>
+        {error && (
+          <div className="mb-4 rounded-lg border border-red-500/50 bg-red-500/10 px-4 py-3 text-sm text-red-500">
+            {error}
           </div>
         )}
+        <Button
+          onClick={handleGeneratePix}
+          disabled={processing || getFinalValue() < 5}
+          className="h-14 w-full bg-emerald-600 text-white hover:bg-emerald-700 text-lg font-semibold"
+        >
+          {processing ? (
+            <>
+              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              Gerando codigo PIX...
+            </>
+          ) : (
+            <>
+              <Wallet className="mr-2 h-5 w-5" />
+              Recarregar via PIX
+            </>
+          )}
+        </Button>
 
         {/* How it works */}
         <div className="mt-8 rounded-lg border border-border bg-card p-6">
           <h3 className="mb-4 font-semibold text-foreground">Como funciona?</h3>
           <ol className="space-y-2 text-sm text-muted-foreground">
             <li>1. Selecione ou digite o valor desejado</li>
-            <li>2. Clique em &quot;Gerar código PIX&quot;</li>
-            <li>3. Copie o código ou escaneie o QR Code</li>
-            <li>4. O saldo é creditado automaticamente</li>
+            <li>2. Clique em &quot;Recarregar via PIX&quot;</li>
+            <li>3. Copie o codigo ou escaneie o QR Code</li>
+            <li>4. O saldo e creditado automaticamente apos o pagamento</li>
           </ol>
         </div>
       </div>
