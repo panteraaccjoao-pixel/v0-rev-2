@@ -1,8 +1,8 @@
 "use server"
 
 import { NextRequest, NextResponse } from "next/server"
-import { cookies } from "next/headers"
 import QRCode from "qrcode"
+import { getGatewayConfigRaw } from "@/app/api/admin/config/route"
 
 // Gateway URLs by provider
 const GATEWAY_URLS: Record<string, { sandbox: string; production: string }> = {
@@ -36,20 +36,18 @@ const GATEWAY_URLS: Record<string, { sandbox: string; production: string }> = {
   },
 }
 
-// Get gateway config from admin panel
+// Get gateway config from admin panel (banco de dados)
 async function getGatewayConfig() {
-  const cookieStore = await cookies()
-  const gatewayConfig = cookieStore.get("rev_gateway_config")?.value
-  return gatewayConfig ? JSON.parse(gatewayConfig) : null
+  return getGatewayConfigRaw()
 }
 
 export async function POST(request: NextRequest) {
   try {
     const { amount, userId, userEmail } = await request.json()
 
-    if (!amount || amount < 5) {
+    if (!amount || amount < 15) {
       return NextResponse.json(
-        { error: "Valor minimo e R$ 5,00" },
+        { error: "Valor minimo e R$ 15,00" },
         { status: 400 }
       )
     }
@@ -63,7 +61,7 @@ export async function POST(request: NextRequest) {
         amount,
         userId,
         userEmail,
-        config,
+        config: config as { gateway: string; environment: string; apiKey: string; secretKey?: string; pixKey?: string },
       })
       
       return NextResponse.json(gatewayResponse)

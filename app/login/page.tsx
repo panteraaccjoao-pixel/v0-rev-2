@@ -6,6 +6,7 @@ import { ArrowLeft, Eye, EyeOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { createClient } from "@/lib/supabase/client"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -20,26 +21,40 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password })
+      const supabase = createClient()
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
+        password,
       })
 
-      const data = await response.json().catch(() => null)
+      // Registra a tentativa de login para o painel admin (não bloqueia o fluxo)
+      fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim().toLowerCase(), success: !signInError }),
+      }).catch(() => {})
 
-      if (response.ok && data?.success) {
-        localStorage.setItem("user_session", JSON.stringify(data))
-        // Hard navigation ensures it works even inside the preview iframe
-        window.location.href = "/dashboard"
+      if (signInError) {
+        if (signInError.message.toLowerCase().includes("not confirmed")) {
+          setError("Confirme seu email antes de entrar. Verifique sua caixa de entrada.")
+        } else {
+          setError("Email ou senha incorretos")
+        }
         return
       }
 
-      if (response.status === 429) {
-        setError(data?.error || "Muitas tentativas. Aguarde alguns minutos e tente novamente.")
-      } else {
-        setError(data?.message || data?.error || "Email ou senha incorretos")
-      }
+      const name = (data.user?.user_metadata?.name as string) || data.user?.email || "Usuário"
+      localStorage.setItem(
+        "user_session",
+        JSON.stringify({
+          success: true,
+          userId: data.user?.id,
+          name,
+          email: data.user?.email,
+        })
+      )
+      // Hard navigation ensures it works even inside the preview iframe
+      window.location.href = "/dashboard"
     } catch (err) {
       setError("Erro ao fazer login. Tente novamente.")
     } finally {

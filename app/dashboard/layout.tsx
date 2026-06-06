@@ -21,6 +21,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { createClient } from "@/lib/supabase/client"
 
 const platformItems = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -57,10 +58,13 @@ export default function DashboardLayout({
   const [discordServerUrl, setDiscordServerUrl] = useState("")
 
   useEffect(() => {
+    let active = true
+    const supabase = createClient()
+
     const redirectToLogin = () => {
+      if (!active) return
       setCheckingAuth(false)
       router.replace("/login")
-      // Fallback: ensure navigation completes even if soft routing is blocked (e.g. preview iframe)
       setTimeout(() => {
         if (window.location.pathname.startsWith("/dashboard")) {
           window.location.href = "/login"
@@ -68,49 +72,50 @@ export default function DashboardLayout({
       }, 400)
     }
 
-    let session: string | null = null
-    try {
-      session = localStorage.getItem("user_session")
-    } catch {
-      session = null
-    }
+    const checkAuth = async () => {
+      const {
+        data: { user: authUser },
+      } = await supabase.auth.getUser()
 
-    if (!session) {
-      redirectToLogin()
-      return
-    }
+      if (!active) return
 
-    try {
-      const data = JSON.parse(session)
-      // Handle both formats: { user: {...} } or { name, email }
-      const userData = data.user || data
-      if (!userData || (!userData.name && !userData.email)) {
+      if (!authUser) {
+        try {
+          localStorage.removeItem("user_session")
+        } catch {}
         redirectToLogin()
         return
       }
-      setUser({ 
-        name: userData?.name || "Usuário", 
-        email: userData?.email || "" 
-      })
+
+      const name = (authUser.user_metadata?.name as string) || authUser.email || "Usuário"
+      setUser({ name, email: authUser.email || "" })
       setCheckingAuth(false)
-    } catch {
-      redirectToLogin()
     }
+
+    checkAuth()
 
     // Fetch Discord server URL
     fetch("/api/admin/settings")
-      .then(res => res.json())
-      .then(data => {
-        if (data.discordServerUrl) {
+      .then((res) => res.json())
+      .then((data) => {
+        if (active && data.discordServerUrl) {
           setDiscordServerUrl(data.discordServerUrl)
         }
       })
       .catch(console.error)
+
+    return () => {
+      active = false
+    }
   }, [router])
 
-  const handleLogout = () => {
-    localStorage.removeItem("user_session")
-    router.push("/login")
+  const handleLogout = async () => {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    try {
+      localStorage.removeItem("user_session")
+    } catch {}
+    window.location.href = "/login"
   }
 
   if (!user) {

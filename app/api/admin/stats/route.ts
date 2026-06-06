@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { cookies } from "next/headers"
+import { getDbConfigRaw } from "@/app/api/admin/config/route"
 
 // In-memory store for demo (use your database in production)
 let statsData = {
@@ -18,13 +18,11 @@ let statsData = {
 export async function GET() {
   try {
     // In production, fetch from your database using the stored config
-    const cookieStore = await cookies()
-    const dbConfig = cookieStore.get("rev_db_config")?.value
-    
+    const dbConfig = await getDbConfigRaw()
+
     if (dbConfig) {
       // Here you would connect to the user's database and fetch real data
-      // const config = JSON.parse(dbConfig)
-      // const data = await fetchFromDatabase(config)
+      // const data = await fetchFromDatabase(dbConfig)
     }
 
     // Fetch real-time data from other APIs

@@ -1,15 +1,14 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { ArrowLeft, Eye, EyeOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { createClient } from "@/lib/supabase/client"
 
 export default function RegisterPage() {
-  const router = useRouter()
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -45,34 +44,46 @@ export default function RegisterPage() {
     setLoading(true)
 
     try {
-      const response = await fetch("/api/users", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "register",
-          name: name.trim(),
-          email: email.trim().toLowerCase(),
-          password,
-        }),
+      const supabase = createClient()
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email: email.trim().toLowerCase(),
+        password,
+        options: {
+          emailRedirectTo:
+            process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL ??
+            `${window.location.origin}/auth/callback`,
+          data: {
+            name: name.trim(),
+          },
+        },
       })
 
-      const data = await response.json()
+      if (signUpError) {
+        if (signUpError.message.toLowerCase().includes("already")) {
+          setError("Este email já está cadastrado")
+        } else {
+          setError(signUpError.message)
+        }
+        return
+      }
 
-      if (data.success) {
-        // Store session and redirect to dashboard
+      // Se já houver sessão (confirmação de email desativada), vai direto ao dashboard
+      if (data.session) {
         localStorage.setItem(
           "user_session",
           JSON.stringify({
             success: true,
-            userId: data.user.id,
-            name: data.user.name,
-            email: data.user.email,
+            userId: data.user?.id,
+            name: name.trim(),
+            email: email.trim().toLowerCase(),
           })
         )
-        router.push("/dashboard")
-      } else {
-        setError(data.error === "User already exists" ? "Este email já está cadastrado" : "Erro ao criar conta")
+        window.location.href = "/dashboard"
+        return
       }
+
+      // Caso contrário, precisa confirmar o email
+      window.location.href = "/auth/sign-up-success"
     } catch {
       setError("Erro ao criar conta. Tente novamente.")
     } finally {

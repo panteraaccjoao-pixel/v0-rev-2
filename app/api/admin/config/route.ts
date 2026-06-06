@@ -1,28 +1,34 @@
 import { NextResponse } from "next/server"
-import { cookies } from "next/headers"
+import { createAdminClient } from "@/lib/supabase/admin"
+
+async function getConfig(key: string) {
+  const admin = createAdminClient()
+  const { data } = await admin.from("app_config").select("value").eq("key", key).maybeSingle()
+  return (data?.value as Record<string, any>) || null
+}
+
+async function saveConfig(key: string, value: Record<string, any>) {
+  const admin = createAdminClient()
+  await admin
+    .from("app_config")
+    .upsert({ key, value, updated_at: new Date().toISOString() })
+}
 
 export async function POST(request: Request) {
   try {
     const body = await request.json()
     const { type, config, dbConfig, gatewayConfig } = body
-    
-    const cookieStore = await cookies()
-    
-    // Handle new format with type field
+
     if (type === "gateway") {
-      // Preserve existing config and only update non-masked values
-      const existingConfig = cookieStore.get("rev_gateway_config")?.value
-      let existing = existingConfig ? JSON.parse(existingConfig) : {}
-      
-      const updatedConfig = {
+      const existing = (await getConfig("gateway")) || {}
+      const updatedConfig: Record<string, any> = {
         ...existing,
         gateway: config.gateway,
         environment: config.environment,
         pixKey: config.pixKey,
         updatedAt: new Date().toISOString(),
       }
-      
-      // Only update keys if they're not masked
+
       if (config.apiKey && !config.apiKey.startsWith("***")) {
         updatedConfig.apiKey = config.apiKey
       }
@@ -32,22 +38,14 @@ export async function POST(request: Request) {
       if (config.webhookSecret && !config.webhookSecret.startsWith("***")) {
         updatedConfig.webhookSecret = config.webhookSecret
       }
-      
-      cookieStore.set("rev_gateway_config", JSON.stringify(updatedConfig), {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
-        maxAge: 60 * 60 * 24 * 365,
-      })
-      
+
+      await saveConfig("gateway", updatedConfig)
       return NextResponse.json({ success: true, message: "Configuracoes salvas com sucesso" })
     }
 
     if (type === "captcha") {
-      const existingConfig = cookieStore.get("rev_captcha_config")?.value
-      const existing = existingConfig ? JSON.parse(existingConfig) : {}
-
-      const updatedConfig: Record<string, unknown> = {
+      const existing = (await getConfig("captcha")) || {}
+      const updatedConfig: Record<string, any> = {
         ...existing,
         provider: config.provider,
         enabled: config.enabled,
@@ -55,39 +53,22 @@ export async function POST(request: Request) {
         updatedAt: new Date().toISOString(),
       }
 
-      // Only update secret key if it's not masked
       if (config.secretKey && !config.secretKey.startsWith("***")) {
         updatedConfig.secretKey = config.secretKey
       }
 
-      cookieStore.set("rev_captcha_config", JSON.stringify(updatedConfig), {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
-        maxAge: 60 * 60 * 24 * 365,
-      })
-
+      await saveConfig("captcha", updatedConfig)
       return NextResponse.json({ success: true, message: "Configuracoes salvas com sucesso" })
     }
 
     if (dbConfig) {
-      cookieStore.set("rev_db_config", JSON.stringify(dbConfig), {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
-        maxAge: 60 * 60 * 24 * 365,
-      })
+      await saveConfig("db", dbConfig)
     }
-    
+
     if (gatewayConfig) {
-      cookieStore.set("rev_gateway_config", JSON.stringify(gatewayConfig), {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
-        maxAge: 60 * 60 * 24 * 365,
-      })
+      await saveConfig("gateway", gatewayConfig)
     }
-    
+
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error("Error saving config:", error)
@@ -97,35 +78,36 @@ export async function POST(request: Request) {
 
 export async function GET() {
   try {
-    const cookieStore = await cookies()
-    const dbConfig = cookieStore.get("rev_db_config")?.value
-    const gatewayConfig = cookieStore.get("rev_gateway_config")?.value
-    const captchaConfig = cookieStore.get("rev_captcha_config")?.value
-    
-    const parsedGateway = gatewayConfig ? JSON.parse(gatewayConfig) : null
-    const parsedCaptcha = captchaConfig ? JSON.parse(captchaConfig) : null
-    
-    // Mask sensitive data for frontend display
-    const maskedGateway = parsedGateway ? {
-      gateway: parsedGateway.gateway || "",
-      environment: parsedGateway.environment || "sandbox",
-      apiKey: parsedGateway.apiKey ? "***" + parsedGateway.apiKey.slice(-4) : "",
-      secretKey: parsedGateway.secretKey ? "***" + parsedGateway.secretKey.slice(-4) : "",
-      pixKey: parsedGateway.pixKey || "",
-      webhookSecret: parsedGateway.webhookSecret ? "***" + parsedGateway.webhookSecret.slice(-4) : "",
-      isConfigured: !!(parsedGateway.apiKey && parsedGateway.gateway),
-    } : null
+    const parsedDb = await getConfig("db")
+    const parsedGateway = await getConfig("gateway")
+    const parsedCaptcha = await getConfig("captcha")
 
-    const maskedCaptcha = parsedCaptcha ? {
-      provider: parsedCaptcha.provider || "recaptcha",
-      enabled: parsedCaptcha.enabled ?? false,
-      siteKey: parsedCaptcha.siteKey || "",
-      secretKey: parsedCaptcha.secretKey ? "***" + parsedCaptcha.secretKey.slice(-4) : "",
-      isConfigured: !!(parsedCaptcha.siteKey && parsedCaptcha.secretKey),
-    } : null
-    
+    const maskedGateway = parsedGateway
+      ? {
+          gateway: parsedGateway.gateway || "",
+          environment: parsedGateway.environment || "sandbox",
+          apiKey: parsedGateway.apiKey ? "***" + String(parsedGateway.apiKey).slice(-4) : "",
+          secretKey: parsedGateway.secretKey ? "***" + String(parsedGateway.secretKey).slice(-4) : "",
+          pixKey: parsedGateway.pixKey || "",
+          webhookSecret: parsedGateway.webhookSecret
+            ? "***" + String(parsedGateway.webhookSecret).slice(-4)
+            : "",
+          isConfigured: !!(parsedGateway.apiKey && parsedGateway.gateway),
+        }
+      : null
+
+    const maskedCaptcha = parsedCaptcha
+      ? {
+          provider: parsedCaptcha.provider || "recaptcha",
+          enabled: parsedCaptcha.enabled ?? false,
+          siteKey: parsedCaptcha.siteKey || "",
+          secretKey: parsedCaptcha.secretKey ? "***" + String(parsedCaptcha.secretKey).slice(-4) : "",
+          isConfigured: !!(parsedCaptcha.siteKey && parsedCaptcha.secretKey),
+        }
+      : null
+
     return NextResponse.json({
-      dbConfig: dbConfig ? JSON.parse(dbConfig) : null,
+      dbConfig: parsedDb,
       gatewayConfig: maskedGateway,
       captchaConfig: maskedCaptcha,
     })
@@ -135,16 +117,17 @@ export async function GET() {
   }
 }
 
-// Helper function to get raw gateway config (for internal API use)
+// Helper para obter config bruta do gateway (uso interno por outras rotas)
 export async function getGatewayConfigRaw() {
-  const cookieStore = await cookies()
-  const gatewayConfig = cookieStore.get("rev_gateway_config")?.value
-  return gatewayConfig ? JSON.parse(gatewayConfig) : null
+  return getConfig("gateway")
 }
 
-// Helper function to get raw captcha config (for internal API use)
+// Helper para obter config bruta do captcha (uso interno por outras rotas)
 export async function getCaptchaConfigRaw() {
-  const cookieStore = await cookies()
-  const captchaConfig = cookieStore.get("rev_captcha_config")?.value
-  return captchaConfig ? JSON.parse(captchaConfig) : null
+  return getConfig("captcha")
+}
+
+// Helper para obter config bruta do banco (uso interno por outras rotas)
+export async function getDbConfigRaw() {
+  return getConfig("db")
 }

@@ -1,30 +1,51 @@
 import { NextRequest, NextResponse } from "next/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 
-// In-memory settings storage (replace with database in production)
-let adminSettings = {
+const DEFAULT_SETTINGS = {
   discordAuthUrl: "",
   discordEnabled: true,
   discordServerUrl: "",
   siteName: "REV SYSTEM",
-  maintenanceMode: false
+  maintenanceMode: false,
 }
 
-// GET - Fetch settings
+// GET - busca as configurações
 export async function GET() {
-  return NextResponse.json(adminSettings)
+  try {
+    const admin = createAdminClient()
+    const { data } = await admin
+      .from("app_config")
+      .select("value")
+      .eq("key", "settings")
+      .maybeSingle()
+
+    const settings = { ...DEFAULT_SETTINGS, ...(data?.value || {}) }
+    return NextResponse.json(settings)
+  } catch (error) {
+    console.error("Error fetching settings:", error)
+    return NextResponse.json(DEFAULT_SETTINGS)
+  }
 }
 
-// POST - Update settings
+// POST - atualiza as configurações
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    
-    adminSettings = {
-      ...adminSettings,
-      ...body
-    }
+    const admin = createAdminClient()
 
-    return NextResponse.json({ success: true, settings: adminSettings })
+    const { data: existing } = await admin
+      .from("app_config")
+      .select("value")
+      .eq("key", "settings")
+      .maybeSingle()
+
+    const merged = { ...DEFAULT_SETTINGS, ...(existing?.value || {}), ...body }
+
+    await admin
+      .from("app_config")
+      .upsert({ key: "settings", value: merged, updated_at: new Date().toISOString() })
+
+    return NextResponse.json({ success: true, settings: merged })
   } catch (error) {
     console.error("Error updating settings:", error)
     return NextResponse.json({ error: "Failed to update settings" }, { status: 500 })

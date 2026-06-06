@@ -1,21 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 
-// In-memory storage for users (replace with database in production)
-let users: User[] = [
-  {
-    id: "user_teste_001",
-    name: "Conta Teste",
-    email: "teste@teste.com",
-    createdAt: new Date().toISOString(),
-    balance: 0,
-    totalSpent: 0,
-    purchases: 0,
-    status: "active",
-    discordId: ""
-  }
-]
-
-interface User {
+interface UserView {
   id: string
   name: string
   email: string
@@ -27,102 +13,121 @@ interface User {
   discordId?: string
 }
 
-// GET - List all users
-export async function GET() {
-  return NextResponse.json({
-    users,
-    total: users.length,
-    activeCount: users.filter(u => u.status === "active").length
-  })
+function mapProfile(p: any): UserView {
+  return {
+    id: p.id,
+    name: p.name || "",
+    email: p.email || "",
+    createdAt: p.created_at,
+    balance: Number(p.balance ?? 0),
+    totalSpent: Number(p.total_spent ?? 0),
+    purchases: Number(p.purchases ?? 0),
+    status: (p.status as "active" | "blocked") || "active",
+    discordId: p.discord_id || "",
+  }
 }
 
-// POST - Register or update user
+// GET - lista todos os usuários
+export async function GET() {
+  try {
+    const admin = createAdminClient()
+    const { data, error } = await admin
+      .from("profiles")
+      .select("*")
+      .order("created_at", { ascending: false })
+
+    if (error) throw error
+
+    const users = (data || []).map(mapProfile)
+    return NextResponse.json({
+      users,
+      total: users.length,
+      activeCount: users.filter((u) => u.status === "active").length,
+    })
+  } catch (error) {
+    console.error("Error listing users:", error)
+    return NextResponse.json({ error: "Failed to list users" }, { status: 500 })
+  }
+}
+
+// POST - gerencia usuários (atualizar saldo, compras, bloqueio, discord)
 export async function POST(request: NextRequest) {
   try {
     const data = await request.json()
-    
-    if (data.action === "register") {
-      const existingUser = users.find(u => u.email === data.email)
-      if (existingUser) {
-        return NextResponse.json({ error: "User already exists" }, { status: 400 })
-      }
+    const admin = createAdminClient()
 
-      const newUser: User = {
-        id: `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        name: data.name || "",
-        email: data.email || "",
-        createdAt: new Date().toISOString(),
-        balance: 0,
-        totalSpent: 0,
-        purchases: 0,
-        status: "active",
-        discordId: data.discordId || ""
-      }
-
-      users.push(newUser)
-      return NextResponse.json({ success: true, user: newUser })
+    const findProfile = async () => {
+      const query = admin.from("profiles").select("*")
+      if (data.userId) query.eq("id", data.userId)
+      else if (data.email) query.eq("email", data.email)
+      const { data: profile } = await query.maybeSingle()
+      return profile
     }
 
     if (data.action === "update_balance") {
-      const user = users.find(u => u.id === data.userId || u.email === data.email)
-      if (!user) {
-        return NextResponse.json({ error: "User not found" }, { status: 404 })
-      }
-
-      user.balance += data.amount || 0
-      return NextResponse.json({ success: true, user })
+      const profile = await findProfile()
+      if (!profile) return NextResponse.json({ error: "User not found" }, { status: 404 })
+      const newBalance = Number(profile.balance ?? 0) + (data.amount || 0)
+      const { data: updated } = await admin
+        .from("profiles")
+        .update({ balance: newBalance })
+        .eq("id", profile.id)
+        .select()
+        .maybeSingle()
+      return NextResponse.json({ success: true, user: mapProfile(updated) })
     }
 
     if (data.action === "set_balance") {
-      const user = users.find(u => u.id === data.userId || u.email === data.email)
-      if (!user) {
-        return NextResponse.json({ error: "User not found" }, { status: 404 })
-      }
-
-      user.balance = data.balance || 0
-      return NextResponse.json({ success: true, user })
+      const profile = await findProfile()
+      if (!profile) return NextResponse.json({ error: "User not found" }, { status: 404 })
+      const { data: updated } = await admin
+        .from("profiles")
+        .update({ balance: data.balance || 0 })
+        .eq("id", profile.id)
+        .select()
+        .maybeSingle()
+      return NextResponse.json({ success: true, user: mapProfile(updated) })
     }
 
     if (data.action === "add_purchase") {
-      const user = users.find(u => u.id === data.userId || u.email === data.email)
-      if (!user) {
-        return NextResponse.json({ error: "User not found" }, { status: 404 })
-      }
-
-      user.purchases += 1
-      user.totalSpent += data.amount || 0
-      user.balance -= data.amount || 0
-      return NextResponse.json({ success: true, user })
+      const profile = await findProfile()
+      if (!profile) return NextResponse.json({ error: "User not found" }, { status: 404 })
+      const amount = data.amount || 0
+      const { data: updated } = await admin
+        .from("profiles")
+        .update({
+          purchases: Number(profile.purchases ?? 0) + 1,
+          total_spent: Number(profile.total_spent ?? 0) + amount,
+          balance: Number(profile.balance ?? 0) - amount,
+        })
+        .eq("id", profile.id)
+        .select()
+        .maybeSingle()
+      return NextResponse.json({ success: true, user: mapProfile(updated) })
     }
 
-    if (data.action === "block") {
-      const user = users.find(u => u.id === data.userId)
-      if (!user) {
-        return NextResponse.json({ error: "User not found" }, { status: 404 })
-      }
-
-      user.status = "blocked"
-      return NextResponse.json({ success: true, user })
-    }
-
-    if (data.action === "unblock") {
-      const user = users.find(u => u.id === data.userId)
-      if (!user) {
-        return NextResponse.json({ error: "User not found" }, { status: 404 })
-      }
-
-      user.status = "active"
-      return NextResponse.json({ success: true, user })
+    if (data.action === "block" || data.action === "unblock") {
+      if (!data.userId) return NextResponse.json({ error: "User ID required" }, { status: 400 })
+      const { data: updated } = await admin
+        .from("profiles")
+        .update({ status: data.action === "block" ? "blocked" : "active" })
+        .eq("id", data.userId)
+        .select()
+        .maybeSingle()
+      if (!updated) return NextResponse.json({ error: "User not found" }, { status: 404 })
+      return NextResponse.json({ success: true, user: mapProfile(updated) })
     }
 
     if (data.action === "set_discord") {
-      const user = users.find(u => u.id === data.userId || u.email === data.email)
-      if (!user) {
-        return NextResponse.json({ error: "User not found" }, { status: 404 })
-      }
-
-      user.discordId = data.discordId || ""
-      return NextResponse.json({ success: true, user })
+      const profile = await findProfile()
+      if (!profile) return NextResponse.json({ error: "User not found" }, { status: 404 })
+      const { data: updated } = await admin
+        .from("profiles")
+        .update({ discord_id: data.discordId || "" })
+        .eq("id", profile.id)
+        .select()
+        .maybeSingle()
+      return NextResponse.json({ success: true, user: mapProfile(updated) })
     }
 
     return NextResponse.json({ error: "Invalid action" }, { status: 400 })
@@ -132,7 +137,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// DELETE - Remove user
+// DELETE - remove um usuário (auth + profile via cascade)
 export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -142,18 +147,13 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "User ID required" }, { status: 400 })
     }
 
-    const index = users.findIndex(u => u.id === id)
-    if (index === -1) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 })
-    }
+    const admin = createAdminClient()
+    const { error } = await admin.auth.admin.deleteUser(id)
+    if (error) throw error
 
-    users.splice(index, 1)
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error("Error deleting user:", error)
     return NextResponse.json({ error: "Failed to delete user" }, { status: 500 })
   }
 }
-
-// Export for use in other routes
-export { users }

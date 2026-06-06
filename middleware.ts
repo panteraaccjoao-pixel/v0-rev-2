@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
+import { updateSession } from "@/lib/supabase/proxy"
 
 // Simple in-memory rate limiter for middleware
 const ipRequestCounts = new Map<string, { count: number; resetTime: number }>()
@@ -45,7 +46,7 @@ function checkGlobalRateLimit(ip: string): { allowed: boolean; remaining: number
   return { allowed: true, remaining: maxRequests - entry.count }
 }
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const ip = getClientIP(request)
   const url = request.nextUrl.pathname
 
@@ -89,8 +90,8 @@ export function middleware(request: NextRequest) {
     )
   }
 
-  // Create response with security headers
-  const response = NextResponse.next()
+  // Create response with security headers + refresh Supabase session cookies
+  const response = await updateSession(request)
 
   // Security headers
   response.headers.set("X-Frame-Options", "DENY")
