@@ -5,6 +5,7 @@ import { ArrowLeft, Shield, Copy, Check, Loader2, QrCode, Wallet } from "lucide-
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
+import { Slider } from "@/components/ui/slider"
 import Link from "next/link"
 import Image from "next/image"
 
@@ -452,6 +453,27 @@ export default function RecarregarPage() {
                 {item.label}
               </button>
             ))}
+          </div>
+        </div>
+
+        {/* Slider Value */}
+        <div className="mb-6">
+          <p className="mb-3 text-sm font-medium text-muted-foreground">Ou ajuste o valor</p>
+          <Slider
+            min={10}
+            max={500}
+            step={5}
+            value={[Math.min(Math.max(getFinalValue() || 10, 10), 500)]}
+            onValueChange={(vals) => {
+              setRechargeValue(vals[0])
+              setCustomValue("")
+              setError(null)
+            }}
+            className="[&_[data-slot=slider-range]]:bg-accent [&_[data-slot=slider-thumb]]:border-accent"
+          />
+          <div className="mt-2 flex justify-between text-sm text-muted-foreground">
+            <span>R$ 10</span>
+            <span>R$ 500</span>
           </div>
         </div>
 
