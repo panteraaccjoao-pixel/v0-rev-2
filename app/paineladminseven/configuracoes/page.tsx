@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { Database, CreditCard, Settings, ChevronRight, MessageCircle, Save, ExternalLink, ShieldCheck } from "lucide-react"
+import { Database, CreditCard, Settings, ChevronRight, MessageCircle, Save, ExternalLink, ShieldCheck, KeyRound } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -31,6 +31,14 @@ const configSections = [
     icon: ShieldCheck,
     color: "text-amber-500",
     bgColor: "bg-amber-500/10",
+  },
+  {
+    title: "Senha do Admin",
+    description: "Altere a senha de acesso ao painel administrativo",
+    href: "/paineladminseven/configuracoes/senha",
+    icon: KeyRound,
+    color: "text-red-500",
+    bgColor: "bg-red-500/10",
   },
 ]
 
