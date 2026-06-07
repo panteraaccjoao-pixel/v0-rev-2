@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
-import store from "@/lib/data-store"
+import store, { verifyPassword, hashPassword, isValidAdminToken } from "@/lib/data-store"
 
 export async function POST(request: NextRequest) {
   try {
-    // Apenas admins logados podem trocar a senha
+    // Apenas admins logados (token válido) podem trocar a senha
     const adminToken = request.cookies.get("admin_token")?.value
-    if (!adminToken) {
+    if (!isValidAdminToken(adminToken)) {
       return NextResponse.json(
         { success: false, message: "Nao autorizado" },
         { status: 401 }
@@ -29,12 +29,10 @@ export async function POST(request: NextRequest) {
     }
 
     const normalizedEmail = String(email).toLowerCase()
-    const admin = store.admins.find(
-      (a) => a.email.toLowerCase() === normalizedEmail && a.password === currentPassword
-    )
+    const admin = store.admins.find((a) => a.email.toLowerCase() === normalizedEmail)
 
-    if (admin) {
-      admin.password = newPassword
+    if (admin && verifyPassword(currentPassword, admin.password)) {
+      admin.password = hashPassword(newPassword)
       return NextResponse.json({
         success: true,
         message: "Senha alterada com sucesso",
