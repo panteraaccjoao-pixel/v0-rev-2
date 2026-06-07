@@ -27,6 +27,34 @@ export interface Order {
   }
 }
 
+// Cria um pedido diretamente (uso interno, server-to-server).
+export function createOrderRecord(data: {
+  userId: string
+  userName?: string
+  product: string
+  level?: string
+  brand?: string
+  total?: number
+  cardData?: Order["cardData"]
+}): Order {
+  const newOrder: Order = {
+    id: `order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    oderId: `#${Math.random().toString(36).substr(2, 8).toUpperCase()}`,
+    userId: data.userId,
+    userName: data.userName || "Cliente",
+    product: data.product,
+    level: data.level || "Standard",
+    brand: data.brand || "visa",
+    quantity: 1,
+    total: data.total || 0,
+    date: new Date().toISOString(),
+    status: "entregue",
+    cardData: data.cardData,
+  }
+  orders.push(newOrder)
+  return newOrder
+}
+
 // GET - List orders
 export async function GET(request: NextRequest) {
   try {

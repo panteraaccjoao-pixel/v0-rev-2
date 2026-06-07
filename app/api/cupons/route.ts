@@ -13,7 +13,45 @@ interface Cupom {
 }
 
 // In-memory storage for cupons
-const cupons: Cupom[] = []
+const globalForCupons = globalThis as unknown as { __cuponsStore?: Cupom[] }
+const cupons: Cupom[] = globalForCupons.__cuponsStore ?? (globalForCupons.__cuponsStore = [])
+
+// Valida um cupom no servidor e retorna o desconto calculado para um subtotal.
+// Não consome o cupom. Retorna null se inválido.
+export function validateCouponServer(
+  code: string,
+  subtotal: number,
+): { code: string; discount: number; type: "percent" | "fixed"; discountAmount: number } | null {
+  if (!code) return null
+  const cupom = cupons.find((c) => c.code === code.toUpperCase() && c.status === "ativo")
+  if (!cupom) return null
+  if (cupom.expiry && new Date(cupom.expiry) < new Date()) return null
+  if (cupom.maxUses && cupom.uses >= cupom.maxUses) return null
+
+  const discountAmount =
+    cupom.type === "percent"
+      ? subtotal * (cupom.discount / 100)
+      : Math.min(cupom.discount, subtotal)
+
+  return {
+    code: cupom.code,
+    discount: cupom.discount,
+    type: cupom.type,
+    discountAmount: Math.max(0, discountAmount),
+  }
+}
+
+// Consome (incrementa o uso de) um cupom no servidor.
+export function useCouponServer(code: string): boolean {
+  if (!code) return false
+  const cupom = cupons.find((c) => c.code === code.toUpperCase() && c.status === "ativo")
+  if (!cupom) return false
+  cupom.uses++
+  if (cupom.maxUses && cupom.uses >= cupom.maxUses) {
+    cupom.status = "expirado"
+  }
+  return true
+}
 
 export async function GET() {
   // Check and update expired coupons

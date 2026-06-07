@@ -4,36 +4,54 @@ import { rateLimitResponse } from "@/lib/security"
 import { createPix } from "@/lib/pix-gateway"
 import { addBalance } from "@/app/api/user/balance/route"
 import { isAuthenticatedAdmin, isInternalRequest, unauthorizedResponse } from "@/lib/admin-auth"
+import {
+  type PixPayment,
+  getPixPayments,
+  addPixPayment,
+  findPixPayment,
+} from "@/lib/pix-store"
+import { fulfillDelivery, type DeliveredCard } from "@/lib/fulfillment"
 
-// In-memory storage for PIX payments
-interface PixPayment {
-  id: string
-  amount: number
-  status: "pending" | "paid" | "expired"
-  pixCode: string
-  qrCodeUrl: string
-  createdAt: Date
-  expiresAt: Date
-  userEmail?: string
-  userId?: string
-  credited?: boolean
-  items: Array<{
-    level: string
-    brand: string
-    quantity: number
-    price: number
-  }>
+// Compat: re-exporta a lista de pagamentos para quem ainda importa daqui.
+export const pixPayments = getPixPayments()
+
+// Entrega os cartões de uma compra paga (idempotente).
+function deliverPurchase(payment: PixPayment): DeliveredCard[] {
+  if (payment.purpose !== "purchase") return []
+  if (payment.delivered) {
+    // Já entregue: reconstrói a view a partir dos cartões reservados.
+    return payment.reservedCards.map((c) => ({
+      id: c.id,
+      fullCard: c.fullCard,
+      cvv: c.cvv,
+      expiry: c.expiry,
+      bin: c.bin,
+      bank: c.bank,
+      level: c.level,
+      brand: c.brand,
+      price: c.price,
+      holderName: c.holderName,
+      cpf: c.cpf,
+      birthDate: c.birthDate,
+    }))
+  }
+
+  const delivered = fulfillDelivery({
+    cards: payment.reservedCards,
+    userEmail: payment.userEmail,
+    userId: payment.userId,
+    userName: payment.userName,
+  })
+  payment.delivered = true
+  return delivered
 }
 
-export const pixPayments: PixPayment[] = []
-
-// POST - Create new PIX payment (usa a gateway real configurada, ex: VeloraPay)
+// POST - Cria pagamento PIX (usado pela recarga de saldo).
+// Para compras de produto, use /api/checkout.
 export async function POST(request: NextRequest) {
   try {
-    // Rate limiting for PIX creation
     const clientIP = getClientIP(request)
     const rateLimit = checkRateLimit(clientIP, "pix")
-    
     if (!rateLimit.allowed) {
       return rateLimitResponse(rateLimit.resetIn)
     }
@@ -45,10 +63,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Valor invalido" }, { status: 400 })
     }
 
-    // Gera o PIX real na gateway configurada (ou fallback estático em testes)
     const pix = await createPix({ amount, userId, userEmail })
 
-    // Imagem do QR Code: a gateway retorna base64/data URL; se não, geramos via API pública
     const qrCodeUrl =
       pix.qrCodeBase64 ||
       `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(pix.pixCode)}`
@@ -63,11 +79,13 @@ export async function POST(request: NextRequest) {
       expiresAt: pix.expiresAt ? new Date(pix.expiresAt) : new Date(Date.now() + 30 * 60 * 1000),
       userEmail: userEmail ? String(userEmail).toLowerCase() : undefined,
       userId: userId || undefined,
+      purpose: "recharge",
       credited: false,
-      items: items || []
+      reservedCards: [],
+      items: items || [],
     }
 
-    pixPayments.push(payment)
+    addPixPayment(payment)
 
     return NextResponse.json({
       success: true,
@@ -76,8 +94,8 @@ export async function POST(request: NextRequest) {
         amount: payment.amount,
         pixCode: payment.pixCode,
         qrCodeUrl: payment.qrCodeUrl,
-        expiresAt: payment.expiresAt
-      }
+        expiresAt: payment.expiresAt,
+      },
     })
   } catch (error) {
     console.error("Error creating PIX payment:", error)
@@ -85,7 +103,8 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// GET - Check payment status
+// GET - Verifica status do pagamento.
+// Para compras pagas, retorna também os cartões entregues.
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -95,23 +114,39 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "ID do pagamento obrigatorio" }, { status: 400 })
     }
 
-    const payment = pixPayments.find(p => p.id === id)
+    const payment = findPixPayment(id)
 
     if (!payment) {
       return NextResponse.json({ error: "Pagamento nao encontrado" }, { status: 404 })
     }
 
-    // Check if expired
+    // Marca como expirado se passou do prazo (estoque reservado volta a ficar livre? 
+    // mantemos reservado para simplicidade; reposição manual via admin).
     if (payment.status === "pending" && new Date() > payment.expiresAt) {
       payment.status = "expired"
     }
 
-    return NextResponse.json({
+    const response: {
+      id: string
+      amount: number
+      status: string
+      expiresAt: Date
+      purpose: string
+      cards?: DeliveredCard[]
+    } = {
       id: payment.id,
       amount: payment.amount,
       status: payment.status,
-      expiresAt: payment.expiresAt
-    })
+      expiresAt: payment.expiresAt,
+      purpose: payment.purpose,
+    }
+
+    // Se a compra já foi paga, garante a entrega e devolve os cartões.
+    if (payment.status === "paid" && payment.purpose === "purchase") {
+      response.cards = deliverPurchase(payment)
+    }
+
+    return NextResponse.json(response)
   } catch (error) {
     console.error("Error checking payment:", error)
     return NextResponse.json({ error: "Erro ao verificar pagamento" }, { status: 500 })
@@ -120,7 +155,7 @@ export async function GET(request: NextRequest) {
 
 // PATCH - Confirma/cancela pagamento.
 // Restrito a admin autenticado ou chamada interna (ex: webhook da gateway).
-// O crédito de saldo acontece aqui no servidor, nunca no client.
+// Recarga: credita saldo. Compra: entrega os cartões. Tudo no servidor.
 export async function PATCH(request: NextRequest) {
   if (!isAuthenticatedAdmin(request) && !isInternalRequest(request)) {
     return unauthorizedResponse()
@@ -133,7 +168,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "ID do pagamento obrigatorio" }, { status: 400 })
     }
 
-    const payment = pixPayments.find(p => p.id === id)
+    const payment = findPixPayment(id)
 
     if (!payment) {
       return NextResponse.json({ error: "Pagamento nao encontrado" }, { status: 404 })
@@ -141,12 +176,19 @@ export async function PATCH(request: NextRequest) {
 
     if (action === "confirm") {
       payment.status = "paid"
-      // Credita o saldo do dono do pagamento apenas uma vez
-      if (!payment.credited && payment.userEmail) {
-        await addBalance(payment.userEmail, payment.amount)
-        payment.credited = true
+
+      if (payment.purpose === "recharge") {
+        // Credita o saldo do dono do pagamento apenas uma vez.
+        if (!payment.credited && payment.userEmail) {
+          await addBalance(payment.userEmail, payment.amount)
+          payment.credited = true
+        }
+        return NextResponse.json({ success: true, status: "paid" })
       }
-      return NextResponse.json({ success: true, status: "paid" })
+
+      // Compra: entrega os cartões reservados (idempotente).
+      const cards = deliverPurchase(payment)
+      return NextResponse.json({ success: true, status: "paid", cards })
     }
 
     if (action === "cancel") {
