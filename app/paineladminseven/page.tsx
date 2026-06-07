@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { adminFetch } from "@/lib/admin-fetch"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { 
@@ -57,7 +58,7 @@ export default function AdminDashboard() {
 
   const fetchStats = useCallback(async () => {
     try {
-      const res = await fetch("/api/admin/stats")
+      const res = await adminFetch("/api/admin/stats")
       if (res.ok) {
         const data = await res.json()
         setStats(data)
@@ -80,7 +81,7 @@ export default function AdminDashboard() {
   const handleReset = async () => {
     setResetting(true)
     try {
-      await fetch("/api/admin/stats", {
+      await adminFetch("/api/admin/stats", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "reset" })

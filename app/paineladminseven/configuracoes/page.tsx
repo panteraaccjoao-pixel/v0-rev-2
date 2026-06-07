@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { adminFetch } from "@/lib/admin-fetch"
 import Link from "next/link"
 import { Database, CreditCard, Settings, ChevronRight, MessageCircle, Save, ExternalLink, ShieldCheck, KeyRound } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -51,7 +52,7 @@ export default function ConfiguracoesPage() {
 
   useEffect(() => {
     // Load settings
-    fetch("/api/admin/settings")
+    adminFetch("/api/admin/settings")
       .then(res => res.json())
       .then(data => {
         setDiscordAuthUrl(data.discordAuthUrl || "")
@@ -64,7 +65,7 @@ export default function ConfiguracoesPage() {
   const handleSaveDiscord = async () => {
     setSaving(true)
     try {
-      const res = await fetch("/api/admin/settings", {
+      const res = await adminFetch("/api/admin/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ discordAuthUrl, discordServerUrl, discordEnabled })

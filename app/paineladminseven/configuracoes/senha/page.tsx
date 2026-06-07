@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { adminFetch } from "@/lib/admin-fetch"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -39,7 +40,7 @@ export default function SenhaPage() {
 
     setIsSaving(true)
     try {
-      const res = await fetch("/api/admin/password", {
+      const res = await adminFetch("/api/admin/password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

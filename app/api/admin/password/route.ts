@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
-import store, { verifyPassword, hashPassword, isValidAdminToken } from "@/lib/data-store"
+import store, { verifyPassword, hashPassword } from "@/lib/data-store"
+import { isAuthenticatedAdmin } from "@/lib/admin-auth"
 
 export async function POST(request: NextRequest) {
   try {
     // Apenas admins logados (token válido) podem trocar a senha
-    const adminToken = request.cookies.get("admin_token")?.value
-    if (!isValidAdminToken(adminToken)) {
+    if (!isAuthenticatedAdmin(request)) {
       return NextResponse.json(
         { success: false, message: "Nao autorizado" },
         { status: 401 }

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { adminFetch } from "@/lib/admin-fetch"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -49,7 +50,7 @@ export default function GiftsPage() {
 
   const fetchGifts = useCallback(async () => {
     try {
-      const res = await fetch("/api/gifts")
+      const res = await adminFetch("/api/gifts")
       if (res.ok) {
         const data = await res.json()
         setGifts(data.gifts || [])
@@ -70,7 +71,7 @@ export default function GiftsPage() {
     if (!newGift.value || Number.parseFloat(newGift.value) <= 0) return
     setCreating(true)
     try {
-      const res = await fetch("/api/gifts", {
+      const res = await adminFetch("/api/gifts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(newGift),
@@ -89,7 +90,7 @@ export default function GiftsPage() {
 
   const handleDelete = async (id: string) => {
     try {
-      const res = await fetch(`/api/gifts?id=${id}`, { method: "DELETE" })
+      const res = await adminFetch(`/api/gifts?id=${id}`, { method: "DELETE" })
       if (res.ok) {
         setGifts((prev) => prev.filter((g) => g.id !== id))
       }

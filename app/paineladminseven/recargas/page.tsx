@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { adminFetch } from "@/lib/admin-fetch"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -83,7 +84,7 @@ export default function RecargasPage() {
 
   const fetchRecharges = useCallback(async () => {
     try {
-      const res = await fetch("/api/recargas")
+      const res = await adminFetch("/api/recargas")
       if (res.ok) {
         const data = await res.json()
         setRecharges(data.recharges || [])
@@ -107,7 +108,7 @@ export default function RecargasPage() {
 
   const handleApprove = async (rechargeId: string) => {
     try {
-      const res = await fetch("/api/recargas", {
+      const res = await adminFetch("/api/recargas", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "approve", rechargeId })
@@ -120,7 +121,7 @@ export default function RecargasPage() {
 
   const handleReject = async (rechargeId: string) => {
     try {
-      const res = await fetch("/api/recargas", {
+      const res = await adminFetch("/api/recargas", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "reject", rechargeId })

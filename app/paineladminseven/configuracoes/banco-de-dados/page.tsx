@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { adminFetch } from "@/lib/admin-fetch"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -43,7 +44,7 @@ export default function BancoDeDadosPage() {
     setTestResult(null)
     
     try {
-      const res = await fetch("/api/admin/test-db", {
+      const res = await adminFetch("/api/admin/test-db", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(config),
@@ -65,7 +66,7 @@ export default function BancoDeDadosPage() {
     setIsSaving(true)
     
     try {
-      await fetch("/api/admin/config", {
+      await adminFetch("/api/admin/config", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type: "database", config }),

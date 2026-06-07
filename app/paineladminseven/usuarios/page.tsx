@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { adminFetch } from "@/lib/admin-fetch"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -68,7 +69,7 @@ export default function UsuariosPage() {
 
   const fetchUsers = useCallback(async () => {
     try {
-      const res = await fetch("/api/users")
+      const res = await adminFetch("/api/users")
       if (res.ok) {
         const data = await res.json()
         setUsers(data.users || [])
@@ -92,7 +93,7 @@ export default function UsuariosPage() {
 
   const handleBlockUser = async (userId: string) => {
     try {
-      const res = await fetch("/api/users", {
+      const res = await adminFetch("/api/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "block", userId })
@@ -105,7 +106,7 @@ export default function UsuariosPage() {
 
   const handleUnblockUser = async (userId: string) => {
     try {
-      const res = await fetch("/api/users", {
+      const res = await adminFetch("/api/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "unblock", userId })
@@ -118,7 +119,7 @@ export default function UsuariosPage() {
 
   const handleDeleteUser = async (userId: string) => {
     try {
-      const res = await fetch(`/api/users?id=${userId}`, { method: "DELETE" })
+      const res = await adminFetch(`/api/users?id=${userId}`, { method: "DELETE" })
       if (res.ok) fetchUsers()
     } catch (error) {
       console.error("Error deleting user:", error)
@@ -129,7 +130,7 @@ export default function UsuariosPage() {
     if (!selectedUser) return
     setUpdating(true)
     try {
-      const res = await fetch("/api/users", {
+      const res = await adminFetch("/api/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 

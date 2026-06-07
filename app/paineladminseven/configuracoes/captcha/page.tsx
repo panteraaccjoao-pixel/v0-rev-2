@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { adminFetch } from "@/lib/admin-fetch"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -35,7 +36,7 @@ export default function CaptchaPage() {
   useEffect(() => {
     async function loadConfig() {
       try {
-        const res = await fetch("/api/admin/config")
+        const res = await adminFetch("/api/admin/config")
         const data = await res.json()
         if (data.captchaConfig) {
           setConfig({
@@ -59,7 +60,7 @@ export default function CaptchaPage() {
     setSaveMessage(null)
 
     try {
-      const res = await fetch("/api/admin/config", {
+      const res = await adminFetch("/api/admin/config", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type: "captcha", config }),

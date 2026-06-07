@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { adminFetch } from "@/lib/admin-fetch"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -89,7 +90,7 @@ export default function CuponsPage() {
 
   const fetchCupons = useCallback(async () => {
     try {
-      const res = await fetch("/api/cupons")
+      const res = await adminFetch("/api/cupons")
       if (res.ok) {
         const data = await res.json()
         setCupons(data.cupons || [])
@@ -120,7 +121,7 @@ export default function CuponsPage() {
     
     setAdding(true)
     try {
-      const res = await fetch("/api/cupons", {
+      const res = await adminFetch("/api/cupons", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -149,7 +150,7 @@ export default function CuponsPage() {
 
   const handleDeleteCoupon = async (id: string) => {
     try {
-      const res = await fetch(`/api/cupons?id=${id}`, { method: "DELETE" })
+      const res = await adminFetch(`/api/cupons?id=${id}`, { method: "DELETE" })
       if (res.ok) fetchCupons()
     } catch (error) {
       console.error("Error deleting coupon:", error)
@@ -158,7 +159,7 @@ export default function CuponsPage() {
 
   const handleToggleStatus = async (id: string) => {
     try {
-      const res = await fetch("/api/cupons", {
+      const res = await adminFetch("/api/cupons", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "toggle_status", cupomId: id })

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { adminFetch } from "@/lib/admin-fetch"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -42,7 +43,7 @@ export default function DropsAdminPage() {
 
   const fetchDrops = async () => {
     try {
-      const res = await fetch("/api/drops")
+      const res = await adminFetch("/api/drops")
       if (res.ok) {
         const data = await res.json()
         setDrops(data.drops || [])
@@ -67,7 +68,7 @@ export default function DropsAdminPage() {
     
     setIsCreating(true)
     try {
-      const res = await fetch("/api/drops", {
+      const res = await adminFetch("/api/drops", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(newDrop),
@@ -92,7 +93,7 @@ export default function DropsAdminPage() {
 
   const handleDeleteDrop = async (dropId: string) => {
     try {
-      const res = await fetch(`/api/drops?id=${dropId}`, {
+      const res = await adminFetch(`/api/drops?id=${dropId}`, {
         method: "DELETE",
       })
       if (res.ok) {
