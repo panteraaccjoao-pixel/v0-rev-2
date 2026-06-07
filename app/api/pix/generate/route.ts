@@ -35,8 +35,8 @@ const GATEWAY_URLS: Record<string, { sandbox: string; production: string }> = {
     production: "https://api.pushinpay.com.br/api/pix",
   },
   velorapay: {
-    sandbox: "https://api.velorapay.com",
-    production: "https://api.velorapay.com",
+    sandbox: "https://api.velorapay.com.br",
+    production: "https://api.velorapay.com.br",
   },
 }
 
@@ -285,42 +285,32 @@ async function pushinPayCreatePix({ amount, userId, userEmail, config, baseUrl }
 }
 
 // VeloraPay integration
-// Autentica via Basic Auth (publicKey:secretKey) e cria uma cobrança PIX (cash-in).
-// O parsing da resposta é flexível para suportar variações de nomes de campos.
+// Doc oficial: https://velorapay.com.br/docs
+// Autentica via headers x-api-key (público) + x-api-secret (segredo).
+// Endpoint POST /payments/create -> retorna { qrCode, copyAndPaste, transactionId }.
 async function veloraPayCreatePix({ amount, userId, userEmail, config, baseUrl }: any) {
   const publicKey = config.apiKey
   const secretKey = config.secretKey || ""
 
-  // Basic Auth com as duas chaves (padrão comum em gateways PIX)
-  const basicToken = Buffer.from(`${publicKey}:${secretKey}`).toString("base64")
-
-  const response = await fetch(`${baseUrl}/v1/transactions`, {
+  const response = await fetch(`${baseUrl}/payments/create`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "Accept": "application/json",
-      "Authorization": `Basic ${basicToken}`,
-      // Alguns gateways também aceitam as chaves em headers próprios
-      "x-public-key": publicKey,
-      "x-secret-key": secretKey,
+      "x-api-key": publicKey,
+      "x-api-secret": secretKey,
+      "Idempotency-Key": `rev-${userId || "anon"}-${Date.now()}`,
     },
     body: JSON.stringify({
-      paymentMethod: "pix",
-      amount: Math.round(amount * 100), // valor em centavos
-      currency: "BRL",
+      amount: Number(amount.toFixed(2)), // valor em reais (decimal)
+      payerName: "Cliente REV SYSTEM",
+      payerDocument: "12345678900",
       description: "Recarga REV SYSTEM",
-      externalRef: userId || `REV-${Date.now()}`,
-      customer: {
-        email: userEmail || "cliente@email.com",
-      },
+      source: "rev-system",
     }),
   })
 
   const rawText = await response.text()
-  console.log("[v0] VeloraPay status:", response.status)
-  console.log("[v0] VeloraPay baseUrl:", baseUrl)
-  console.log("[v0] VeloraPay resposta:", rawText.slice(0, 1000))
-
   let data: any = {}
   try {
     data = JSON.parse(rawText)
@@ -332,17 +322,20 @@ async function veloraPayCreatePix({ amount, userId, userEmail, config, baseUrl }
     throw new Error(data?.message || data?.error || `Erro na VeloraPay (HTTP ${response.status})`)
   }
 
-  // Procura o copia-e-cola e o QR Code em vários formatos possíveis
-  const pix = data.pix || data.charge || data.data || data.transaction || data
+  // A resposta pode vir na raiz ou aninhada em data/payment/transaction
+  const tx = data.data || data.payment || data.transaction || data
+
   const pixCode =
-    pix.qrcode || pix.qrCode || pix.copyPaste || pix.pixCopiaECola ||
-    pix.brCode || pix.emv || pix.payload || data.qrcode
+    tx.copyAndPaste || tx.copyPaste || tx.pixCopiaECola || tx.brCode || tx.emv
 
-  let qrCodeBase64 =
-    pix.qrCodeBase64 || pix.qrCodeImage || pix.qr_code_base64 ||
-    pix.qrCodeImageUrl || data.qrCodeBase64 || ""
+  let qrCodeBase64 = tx.qrCode || tx.qrCodeBase64 || tx.qrCodeImage || ""
 
-  // Se a gateway não retornar a imagem, geramos o QR localmente a partir do copia-e-cola
+  // Garante que a imagem do QR esteja em formato data URL exibível
+  if (qrCodeBase64 && !qrCodeBase64.startsWith("data:") && !qrCodeBase64.startsWith("http")) {
+    qrCodeBase64 = `data:image/png;base64,${qrCodeBase64}`
+  }
+
+  // Se a gateway só retornar o copia-e-cola, geramos o QR localmente
   if (!qrCodeBase64 && pixCode) {
     try {
       qrCodeBase64 = await QRCode.toDataURL(pixCode, {
@@ -359,10 +352,10 @@ async function veloraPayCreatePix({ amount, userId, userEmail, config, baseUrl }
     success: true,
     pixCode,
     qrCodeBase64,
-    expiresAt: pix.expiresAt || pix.expiration_date || pix.dueDate ||
+    expiresAt: tx.expiresAt || tx.expiration_date || tx.dueDate ||
       new Date(Date.now() + 30 * 60 * 1000).toISOString(),
-    txId: pix.id || pix.transactionId || pix.externalRef || `REV${Date.now()}`,
-    gatewayId: pix.id,
+    txId: tx.transactionId || tx.internalId || tx.id || `REV${Date.now()}`,
+    gatewayId: tx.transactionId || tx.id,
   }
 }
 
