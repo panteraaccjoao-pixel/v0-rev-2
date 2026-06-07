@@ -24,10 +24,25 @@ interface RecentSale {
 }
 
 export default function DashboardPage() {
-  const [showDiscordBanner, setShowDiscordBanner] = useState(true)
+  const [bannerDismissed, setBannerDismissed] = useState(false)
+  const [discordLinked, setDiscordLinked] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [recentSales, setRecentSales] = useState<RecentSale[]>([])
   const [userBalance, setUserBalance] = useState(0)
+
+  const showDiscordBanner = !bannerDismissed && !discordLinked
+
+  const fetchDiscordStatus = useCallback(async () => {
+    try {
+      const res = await fetch("/api/user/discord")
+      if (res.ok) {
+        const data = await res.json()
+        setDiscordLinked(!!data.linked)
+      }
+    } catch (error) {
+      console.error("Error fetching discord status:", error)
+    }
+  }, [])
 
   const fetchRecentSales = useCallback(async () => {
     try {
@@ -62,15 +77,17 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchRecentSales()
     fetchBalance()
+    fetchDiscordStatus()
     
     // Poll for updates every 3 seconds
     const interval = setInterval(() => {
       fetchRecentSales()
       fetchBalance()
+      fetchDiscordStatus()
     }, 3000)
     
     return () => clearInterval(interval)
-  }, [fetchRecentSales, fetchBalance])
+  }, [fetchRecentSales, fetchBalance, fetchDiscordStatus])
 
   // Mask username for privacy
   const maskUsername = (username: string) => {
@@ -140,7 +157,7 @@ export default function DashboardPage() {
                 </a>
               </Button>
               <button 
-                onClick={() => setShowDiscordBanner(false)}
+                onClick={() => setBannerDismissed(true)}
                 className="rounded-lg p-2 text-muted-foreground hover:bg-secondary hover:text-foreground"
               >
                 <X className="h-4 w-4" />
