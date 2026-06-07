@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { addLoginRecord } from "@/app/api/admin/logins/route"
 import { checkRateLimit, getClientIP } from "@/lib/rate-limit"
 import { sanitizeInput, rateLimitResponse } from "@/lib/security"
-import { findProfileByEmail } from "@/lib/data-store"
+import { findProfileByEmail, verifyPassword } from "@/lib/data-store"
 
 // Helper to parse user agent
 function parseUserAgent(ua: string): { device: string; deviceType: "desktop" | "mobile"; browser: string; os: string } {
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
 
     // Valida credenciais no armazenamento local
     const profile = findProfileByEmail(sanitizedEmail)
-    const isValid = !!profile && (!profile.password || profile.password === password)
+    const isValid = !!profile && (!profile.password || verifyPassword(password, profile.password))
 
     if (profile && profile.status === "blocked") {
       return NextResponse.json({ success: false, message: "Conta bloqueada" }, { status: 403 })

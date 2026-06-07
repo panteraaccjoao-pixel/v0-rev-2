@@ -57,11 +57,12 @@ export function verifyPassword(password: string, stored?: string): boolean {
 }
 
 // Mantém o store entre hot-reloads em desenvolvimento.
-const globalForStore = globalThis as unknown as { __dataStore?: DataStore }
+// A versão na chave força a recriação limpa do store quando os logins mudam.
+const globalForStore = globalThis as unknown as { __dataStore_v2?: DataStore }
 
 const store: DataStore =
-  globalForStore.__dataStore ??
-  (globalForStore.__dataStore = {
+  globalForStore.__dataStore_v2 ??
+  (globalForStore.__dataStore_v2 = {
     profiles: [],
     config: {},
     settings: null,
