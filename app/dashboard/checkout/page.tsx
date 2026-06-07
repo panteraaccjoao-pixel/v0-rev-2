@@ -414,24 +414,6 @@ export default function CheckoutPage() {
     }
   }
 
-  // Simulate payment (for testing)
-  const handleSimulatePayment = async () => {
-    if (!pixPayment) return
-    
-    try {
-      await fetch("/api/pix", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: pixPayment.id, action: "confirm" })
-      })
-      setPaymentStatus("paid")
-      fetchDeliveredCards()
-      localStorage.removeItem("checkout_cart")
-    } catch {
-      console.error("Error simulating payment")
-    }
-  }
-
   if (cartItems.length === 0 && !pixPayment) {
     return (
       <div className="min-h-screen bg-background p-6">
@@ -770,15 +752,6 @@ export default function CheckoutPage() {
                   <Shield className="h-4 w-4" />
                   <span>Pagamento seguro via PIX</span>
                 </div>
-
-                {/* Simulate Payment Button (for testing) */}
-                <Button 
-                  variant="outline" 
-                  className="w-full border-dashed"
-                  onClick={handleSimulatePayment}
-                >
-                  Simular Pagamento (Teste)
-                </Button>
               </>
             ) : (
               <div className="flex flex-col items-center justify-center py-8">

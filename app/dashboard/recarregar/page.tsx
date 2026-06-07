@@ -204,23 +204,6 @@ export default function RecarregarPage() {
     }
   }
 
-  // Simulate payment (for testing)
-  const handleSimulatePayment = async () => {
-    if (!pixPayment) return
-
-    try {
-      await fetch("/api/pix", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: pixPayment.id, action: "confirm" }),
-      })
-      setPaymentStatus("paid")
-      creditBalance(pixPayment.amount)
-    } catch {
-      console.error("Error simulating payment")
-    }
-  }
-
   const handleNewRecharge = () => {
     setPixPayment(null)
     setPaymentStatus("pending")
@@ -376,15 +359,6 @@ export default function RecarregarPage() {
                   <Shield className="h-4 w-4" />
                   <span>Pagamento seguro via PIX</span>
                 </div>
-
-                {/* Simulate Payment Button (for testing) */}
-                <Button
-                  variant="outline"
-                  className="w-full border-dashed"
-                  onClick={handleSimulatePayment}
-                >
-                  Simular Pagamento (Teste)
-                </Button>
               </>
             )}
           </CardContent>
