@@ -31,8 +31,13 @@ const store: DataStore =
     profiles: [],
     config: {},
     settings: null,
-    admins: [{ email: "admin@admin.com", password: "admin123" }],
+    admins: [{ email: "admin@teste.com", password: "admin123" }],
   })
+
+// Garante que o admin exista mesmo após hot-reloads.
+if (!store.admins.some((a) => a.email === "admin@teste.com")) {
+  store.admins.unshift({ email: "admin@teste.com", password: "admin123" })
+}
 
 // Garante que o usuário de teste exista mesmo após hot-reloads.
 if (!store.profiles.some((p) => p.email === "teste@teste.com")) {
