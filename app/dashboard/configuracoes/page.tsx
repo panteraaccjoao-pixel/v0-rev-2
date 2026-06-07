@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { User, Shield, Palette, LogOut, MessageCircle, Check, X, Loader2, ExternalLink } from "lucide-react"
+import { getSessionEmail, setSessionProfile } from "@/lib/session"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -19,6 +20,12 @@ interface AdminSettings {
 }
 
 export default function ConfiguracoesPage() {
+  const [name, setName] = useState("")
+  const [email, setEmail] = useState("")
+  const [profileLoading, setProfileLoading] = useState(false)
+  const [profileError, setProfileError] = useState("")
+  const [profileSuccess, setProfileSuccess] = useState("")
+
   const [discordData, setDiscordData] = useState<DiscordData>({ linked: false })
   const [discordId, setDiscordId] = useState("")
   const [isLinkingDiscord, setIsLinkingDiscord] = useState(false)
@@ -27,6 +34,7 @@ export default function ConfiguracoesPage() {
   const [adminSettings, setAdminSettings] = useState<AdminSettings>({ discordAuthUrl: "", discordEnabled: true })
 
   useEffect(() => {
+    fetchProfile()
     fetchDiscordStatus()
     fetchAdminSettings()
     
@@ -42,6 +50,64 @@ export default function ConfiguracoesPage() {
       window.history.replaceState({}, "", window.location.pathname)
     }
   }, [])
+
+  const fetchProfile = async () => {
+    const sessionEmail = getSessionEmail()
+    if (!sessionEmail) return
+    try {
+      const res = await fetch(`/api/user/profile?email=${encodeURIComponent(sessionEmail)}`)
+      if (res.ok) {
+        const data = await res.json()
+        setName(data.name || "")
+        setEmail(data.email || "")
+      }
+    } catch (error) {
+      console.error("Error fetching profile:", error)
+    }
+  }
+
+  const handleSaveProfile = async () => {
+    setProfileError("")
+    setProfileSuccess("")
+
+    if (!name.trim()) {
+      setProfileError("O nome não pode ficar vazio")
+      return
+    }
+
+    const currentEmail = getSessionEmail()
+    if (!currentEmail) {
+      setProfileError("Sessão não encontrada. Faça login novamente.")
+      return
+    }
+
+    setProfileLoading(true)
+    try {
+      const res = await fetch("/api/user/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentEmail, name: name.trim(), email: email.trim() }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        setProfileError(data.error || "Erro ao salvar alterações")
+        return
+      }
+
+      // Atualiza a sessão local com os novos dados
+      setSessionProfile({ name: data.profile.name, email: data.profile.email })
+      setName(data.profile.name)
+      setEmail(data.profile.email)
+      setProfileSuccess("Alterações salvas com sucesso!")
+      setTimeout(() => setProfileSuccess(""), 3000)
+    } catch {
+      setProfileError("Erro ao salvar alterações")
+    } finally {
+      setProfileLoading(false)
+    }
+  }
 
   const fetchAdminSettings = async () => {
     try {
@@ -195,17 +261,45 @@ export default function ConfiguracoesPage() {
         </div>
 
         <div className="space-y-4">
+          {profileSuccess && (
+            <div className="flex items-center gap-2 rounded-lg bg-green-500/10 p-3 text-sm text-green-500">
+              <Check className="h-4 w-4" />
+              {profileSuccess}
+            </div>
+          )}
+          {profileError && (
+            <div className="flex items-center gap-2 rounded-lg bg-red-500/10 p-3 text-sm text-red-500">
+              <X className="h-4 w-4" />
+              {profileError}
+            </div>
+          )}
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="name">Nome</Label>
-              <Input id="name" placeholder="Seu nome" defaultValue="Usuário" />
+              <Input
+                id="name"
+                placeholder="Seu nome"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="email">E-mail</Label>
-              <Input id="email" type="email" placeholder="seu@email.com" disabled />
+              <Input
+                id="email"
+                type="email"
+                placeholder="seu@email.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
             </div>
           </div>
-          <Button className="bg-accent text-accent-foreground hover:bg-accent/90">
+          <Button
+            onClick={handleSaveProfile}
+            disabled={profileLoading}
+            className="bg-accent text-accent-foreground hover:bg-accent/90"
+          >
+            {profileLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
             Salvar alterações
           </Button>
         </div>
