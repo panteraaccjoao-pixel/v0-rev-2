@@ -48,8 +48,33 @@ export interface PixResult {
   gatewayId?: string
 }
 
-// Get gateway config from env vars (VeloraPay) ou painel admin
+// Considera mascarada qualquer chave salva no formato "***1234".
+// Nunca usamos uma chave mascarada como credencial real.
+function isMaskedKey(value?: string) {
+  return typeof value === "string" && value.startsWith("***")
+}
+
+// Obtém a configuração da gateway.
+// Prioridade: 1) painel admin  2) variáveis de ambiente (VeloraPay) como fallback.
 export async function getGatewayConfig() {
+  // 1. Painel admin tem prioridade (configurável pela interface sem mexer no deploy)
+  const adminConfig = await getGatewayConfigRaw()
+  if (
+    adminConfig?.gateway &&
+    adminConfig?.apiKey &&
+    !isMaskedKey(adminConfig.apiKey) &&
+    !isMaskedKey(adminConfig.secretKey)
+  ) {
+    return {
+      gateway: adminConfig.gateway,
+      environment: adminConfig.environment || "sandbox",
+      apiKey: adminConfig.apiKey,
+      secretKey: adminConfig.secretKey || "",
+      pixKey: adminConfig.pixKey || "",
+    }
+  }
+
+  // 2. Fallback: variáveis de ambiente (VeloraPay)
   const veloraPublic = process.env.VELORAPAY_API_KEYPUBLIC
   const veloraSecret = process.env.VELORAPAY_API_KEYSECRET
 
@@ -62,7 +87,8 @@ export async function getGatewayConfig() {
     }
   }
 
-  return getGatewayConfigRaw()
+  // 3. Sem credenciais: retorna config do painel (pode ter só pixKey p/ PIX estático)
+  return adminConfig
 }
 
 // Ponto de entrada único: gera o PIX usando a gateway configurada ou o fallback estático.
