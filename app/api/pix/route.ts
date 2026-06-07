@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { checkRateLimit, getClientIP } from "@/lib/rate-limit"
 import { rateLimitResponse } from "@/lib/security"
+import { createPix } from "@/lib/pix-gateway"
 
 // In-memory storage for PIX payments
 interface PixPayment {
@@ -21,20 +22,7 @@ interface PixPayment {
 
 export const pixPayments: PixPayment[] = []
 
-// Generate a fake PIX code (in production, this would come from a payment provider)
-function generatePixCode(amount: number, paymentId: string): string {
-  const baseCode = "00020126580014br.gov.bcb.pix0136"
-  const randomKey = `${paymentId}-${Date.now()}`
-  const formattedAmount = amount.toFixed(2).replace(".", "")
-  return `${baseCode}${randomKey}5204000053039865404${formattedAmount}5802BR5925REVSYSTEM6009SAO PAULO62140510${paymentId}6304`
-}
-
-// Generate QR code URL using a free QR code API
-function generateQRCodeUrl(pixCode: string): string {
-  return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(pixCode)}`
-}
-
-// POST - Create new PIX payment
+// POST - Create new PIX payment (usa a gateway real configurada, ex: VeloraPay)
 export async function POST(request: NextRequest) {
   try {
     // Rate limiting for PIX creation
@@ -46,24 +34,28 @@ export async function POST(request: NextRequest) {
     }
 
     const data = await request.json()
-    const { amount, items } = data
+    const { amount, items, userId, userEmail } = data
 
     if (!amount || amount <= 0) {
       return NextResponse.json({ error: "Valor invalido" }, { status: 400 })
     }
 
-    const paymentId = `PIX${Date.now()}${Math.random().toString(36).substring(2, 8).toUpperCase()}`
-    const pixCode = generatePixCode(amount, paymentId)
-    const qrCodeUrl = generateQRCodeUrl(pixCode)
+    // Gera o PIX real na gateway configurada (ou fallback estático em testes)
+    const pix = await createPix({ amount, userId, userEmail })
+
+    // Imagem do QR Code: a gateway retorna base64/data URL; se não, geramos via API pública
+    const qrCodeUrl =
+      pix.qrCodeBase64 ||
+      `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(pix.pixCode)}`
 
     const payment: PixPayment = {
-      id: paymentId,
+      id: pix.txId,
       amount,
       status: "pending",
-      pixCode,
+      pixCode: pix.pixCode,
       qrCodeUrl,
       createdAt: new Date(),
-      expiresAt: new Date(Date.now() + 30 * 60 * 1000), // 30 minutes expiry
+      expiresAt: pix.expiresAt ? new Date(pix.expiresAt) : new Date(Date.now() + 30 * 60 * 1000),
       items: items || []
     }
 

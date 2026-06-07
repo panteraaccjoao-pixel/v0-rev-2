@@ -353,11 +353,24 @@ export default function CheckoutPage() {
       }
 
       // Create PIX payment
+      let sessionUserId = ""
+      let sessionEmail = ""
+      try {
+        const raw = localStorage.getItem("user_session")
+        if (raw) {
+          const s = JSON.parse(raw)
+          sessionUserId = s.userId || ""
+          sessionEmail = s.email || ""
+        }
+      } catch {}
+
       const res = await fetch("/api/pix", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           amount: total,
+          userId: sessionUserId,
+          userEmail: sessionEmail,
           items: cartItems.map(item => ({
             level: item.level,
             brand: item.brand,
