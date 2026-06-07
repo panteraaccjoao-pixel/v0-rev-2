@@ -316,10 +316,20 @@ async function veloraPayCreatePix({ amount, userId, userEmail, config, baseUrl }
     }),
   })
 
-  const data = await response.json().catch(() => ({}))
+  const rawText = await response.text()
+  console.log("[v0] VeloraPay status:", response.status)
+  console.log("[v0] VeloraPay baseUrl:", baseUrl)
+  console.log("[v0] VeloraPay resposta:", rawText.slice(0, 1000))
+
+  let data: any = {}
+  try {
+    data = JSON.parse(rawText)
+  } catch {
+    data = {}
+  }
 
   if (!response.ok) {
-    throw new Error(data?.message || data?.error || "Erro na VeloraPay")
+    throw new Error(data?.message || data?.error || `Erro na VeloraPay (HTTP ${response.status})`)
   }
 
   // Procura o copia-e-cola e o QR Code em vários formatos possíveis
