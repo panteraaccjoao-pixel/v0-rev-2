@@ -14,25 +14,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'REV SYSTEM - Cartões Digitais',
+  title: 'REV',
   description: 'A plataforma mais confiável para cartões digitais. Compre cartões de forma simples, segura e instantânea.',
   generator: 'v0.app',
   icons: {
-    icon: [
-      {
-        url: '/icon-light-32x32.png',
-        media: '(prefers-color-scheme: light)',
-      },
-      {
-        url: '/icon-dark-32x32.png',
-        media: '(prefers-color-scheme: dark)',
-      },
-      {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
-      },
-    ],
-    apple: '/apple-icon.png',
+    icon: '/rev-icon.png',
+    shortcut: '/rev-icon.png',
+    apple: '/rev-icon.png',
   },
 }
 
