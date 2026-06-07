@@ -35,11 +35,6 @@ export default function LoginPage() {
       }).catch(() => {})
 
       if (signInError) {
-        if (signInError.message.toLowerCase().includes("not confirmed")) {
-          // Conta ainda não confirmada: leva para a verificação por código
-          window.location.href = `/auth/verificar?email=${encodeURIComponent(email.trim().toLowerCase())}`
-          return
-        }
         setError("Email ou senha incorretos")
         return
       }

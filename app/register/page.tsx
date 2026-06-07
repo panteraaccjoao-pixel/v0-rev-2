@@ -43,47 +43,46 @@ export default function RegisterPage() {
 
     setLoading(true)
 
+    const normalizedEmail = email.trim().toLowerCase()
+
     try {
-      const supabase = createClient()
-      const { data, error: signUpError } = await supabase.auth.signUp({
-        email: email.trim().toLowerCase(),
-        password,
-        options: {
-          emailRedirectTo:
-            process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL ??
-            `${window.location.origin}/auth/callback`,
-          data: {
-            name: name.trim(),
-          },
-        },
+      // Cria o usuário já confirmado no banco (sem envio de email)
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name.trim(), email: normalizedEmail, password }),
       })
 
-      if (signUpError) {
-        if (signUpError.message.toLowerCase().includes("already")) {
-          setError("Este email já está cadastrado")
-        } else {
-          setError(signUpError.message)
-        }
+      const result = await res.json().catch(() => null)
+
+      if (!res.ok || !result?.success) {
+        setError(result?.error || "Erro ao criar conta. Tente novamente.")
         return
       }
 
-      // Se já houver sessão (confirmação de email desativada), vai direto ao dashboard
-      if (data.session) {
-        localStorage.setItem(
-          "user_session",
-          JSON.stringify({
-            success: true,
-            userId: data.user?.id,
-            name: name.trim(),
-            email: email.trim().toLowerCase(),
-          })
-        )
-        window.location.href = "/dashboard"
+      // Faz login para criar a sessão e entra direto no dashboard
+      const supabase = createClient()
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email: normalizedEmail,
+        password,
+      })
+
+      if (signInError) {
+        // Conta criada, mas não conseguiu logar automaticamente: manda para o login
+        window.location.href = "/login"
         return
       }
 
-      // Caso contrário, precisa confirmar o email com o código enviado
-      window.location.href = `/auth/verificar?email=${encodeURIComponent(email.trim().toLowerCase())}`
+      localStorage.setItem(
+        "user_session",
+        JSON.stringify({
+          success: true,
+          userId: data.user?.id,
+          name: name.trim(),
+          email: normalizedEmail,
+        })
+      )
+      window.location.href = "/dashboard"
     } catch {
       setError("Erro ao criar conta. Tente novamente.")
     } finally {
