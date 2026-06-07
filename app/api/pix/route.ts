@@ -15,6 +15,22 @@ import { fulfillDelivery, type DeliveredCard } from "@/lib/fulfillment"
 // Compat: re-exporta a lista de pagamentos para quem ainda importa daqui.
 export const pixPayments = getPixPayments()
 
+// Confirma um pagamento: credita saldo (recarga) ou entrega cartões (compra).
+// Idempotente e seguro para ser chamado por PATCH e pelo webhook da gateway.
+export async function confirmPayment(payment: PixPayment): Promise<DeliveredCard[]> {
+  payment.status = "paid"
+
+  if (payment.purpose === "recharge") {
+    if (!payment.credited && payment.userEmail) {
+      await addBalance(payment.userEmail, payment.amount)
+      payment.credited = true
+    }
+    return []
+  }
+
+  return deliverPurchase(payment)
+}
+
 // Entrega os cartões de uma compra paga (idempotente).
 function deliverPurchase(payment: PixPayment): DeliveredCard[] {
   if (payment.purpose !== "purchase") return []
@@ -175,19 +191,10 @@ export async function PATCH(request: NextRequest) {
     }
 
     if (action === "confirm") {
-      payment.status = "paid"
-
+      const cards = await confirmPayment(payment)
       if (payment.purpose === "recharge") {
-        // Credita o saldo do dono do pagamento apenas uma vez.
-        if (!payment.credited && payment.userEmail) {
-          await addBalance(payment.userEmail, payment.amount)
-          payment.credited = true
-        }
         return NextResponse.json({ success: true, status: "paid" })
       }
-
-      // Compra: entrega os cartões reservados (idempotente).
-      const cards = deliverPurchase(payment)
       return NextResponse.json({ success: true, status: "paid", cards })
     }
 

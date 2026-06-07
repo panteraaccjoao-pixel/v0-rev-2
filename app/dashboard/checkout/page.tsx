@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import Link from "next/link"
 import Image from "next/image"
+import { getSession } from "@/lib/session"
 
 interface CartItem {
   id: string
@@ -82,164 +83,20 @@ export default function CheckoutPage() {
     }
   }, [searchParams])
 
-  // Create order after successful delivery
-  const createOrder = useCallback(async (cards: DeliveredCard[]) => {
-    try {
-      for (const card of cards) {
-        await fetch("/api/pedidos", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            userId: "user_teste_001",
-            userName: "Conta Teste",
-            product: `${card.level} ${card.brand}`,
-            level: card.level,
-            brand: card.brand,
-            total: cartItems.find(i => i.level === card.level && i.brand === card.brand)?.price || 0,
-            cardData: {
-              fullCard: card.fullCard.replace(/\s/g, ""),
-              cvv: card.cvv,
-              expiry: card.expiry,
-              bin: card.bin,
-              bank: card.bank,
-              holderName: card.holderName,
-              cpf: card.cpf,
-              birthDate: card.birthDate
-            }
-          })
-        })
-      }
-    } catch (error) {
-      console.error("Error creating order:", error)
-    }
-  }, [cartItems])
-
-  // Process purchase: deduct balance and remove from stock
-  const processPurchase = useCallback(async (cards: (DeliveredCard & { id?: string })[]) => {
-    try {
-      // 1. Deduct balance from user
-      const totalAmount = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0)
-      const discountAmount = appliedCoupon 
-        ? (appliedCoupon.type === "percent" 
-            ? totalAmount * (appliedCoupon.discount / 100) 
-            : appliedCoupon.discount)
-        : 0
-      const finalAmount = Math.max(0, totalAmount - discountAmount)
-      
-      if (finalAmount > 0) {
-        await fetch("/api/users", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action: "update_balance",
-            email: "teste@teste.com",
-            amount: -finalAmount
-          })
-        })
-      }
-
-      // 2. Remove products from stock
-      for (const card of cards) {
-        if (card.id) {
-          await fetch(`/api/estoque?id=${card.id}`, {
-            method: "DELETE"
-          })
-        }
-      }
-    } catch (error) {
-      console.error("Error processing purchase:", error)
-    }
-  }, [cartItems, appliedCoupon])
-
-  // Fetch delivered cards after payment
-  const fetchDeliveredCards = useCallback(async () => {
-    setLoadingDelivery(true)
-    try {
-      // Fetch cards from estoque based on cart items
-      const res = await fetch("/api/estoque")
-      const data = await res.json()
-      
-      if (data.products && data.products.length > 0) {
-        const cards: DeliveredCard[] = []
-        
-        for (const item of cartItems) {
-          // Find matching products from stock
-          const matchingProducts = data.products.filter(
-            (p: DeliveredCard & { id: string }) => 
-              p.level?.toLowerCase() === item.level?.toLowerCase() && 
-              p.brand?.toLowerCase() === item.brand?.toLowerCase()
-          )
-          
-          // Take the quantity requested
-          for (let i = 0; i < Math.min(item.quantity, matchingProducts.length); i++) {
-            cards.push(matchingProducts[i])
-          }
-        }
-        
-        const finalCards = cards.length > 0 ? cards : [{
-          fullCard: "4532 1234 5678 9012",
-          cvv: "123",
-          expiry: "12/27",
-          bin: "453212",
-          bank: "Banco Exemplo",
-          level: cartItems[0]?.level || "Standard",
-          brand: cartItems[0]?.brand || "Visa",
-          holderName: "NOME DO TITULAR",
-          cpf: "123.456.789-00"
-        }]
-        setDeliveredCards(finalCards)
-        // Process purchase and create order
-        await processPurchase(finalCards)
-        await createOrder(finalCards)
-      } else {
-        // Fallback card for demo
-        const fallbackCards = [{
-          fullCard: "4532 1234 5678 9012",
-          cvv: "123",
-          expiry: "12/27",
-          bin: "453212",
-          bank: "Banco Exemplo",
-          level: cartItems[0]?.level || "Standard",
-          brand: cartItems[0]?.brand || "Visa",
-          holderName: "NOME DO TITULAR",
-          cpf: "123.456.789-00"
-        }]
-        setDeliveredCards(fallbackCards)
-        await processPurchase(fallbackCards)
-        await createOrder(fallbackCards)
-      }
-    } catch (error) {
-      console.error("Error fetching cards:", error)
-      // Fallback
-      const fallbackCards = [{
-        fullCard: "4532 1234 5678 9012",
-        cvv: "123",
-        expiry: "12/27",
-        bin: "453212",
-        bank: "Banco Exemplo",
-        level: cartItems[0]?.level || "Standard",
-        brand: cartItems[0]?.brand || "Visa"
-      }]
-      setDeliveredCards(fallbackCards)
-      await processPurchase(fallbackCards)
-      await createOrder(fallbackCards)
-    } finally {
-      setLoadingDelivery(false)
-    }
-  }, [cartItems, createOrder, processPurchase])
-
-  // Poll for payment status
+  // Poll for payment status. Quando o pagamento da compra é confirmado pelo
+  // servidor, a entrega (cartões) já foi feita no backend e vem na resposta.
   const checkPaymentStatus = useCallback(async () => {
     if (!pixPayment) return
 
     try {
       const res = await fetch(`/api/pix?id=${pixPayment.id}`)
       const data = await res.json()
-      
+
       if (data.status === "paid") {
         setPaymentStatus("paid")
-        // Fetch delivered cards
-        fetchDeliveredCards()
+        if (Array.isArray(data.cards)) {
+          setDeliveredCards(data.cards)
+        }
         localStorage.removeItem("checkout_cart")
       } else if (data.status === "expired") {
         setPaymentStatus("expired")
@@ -247,7 +104,7 @@ export default function CheckoutPage() {
     } catch (error) {
       console.error("Error checking payment:", error)
     }
-  }, [pixPayment, fetchDeliveredCards])
+  }, [pixPayment])
 
   useEffect(() => {
     if (pixPayment && paymentStatus === "pending") {
@@ -332,60 +189,47 @@ export default function CheckoutPage() {
 
   const handleFinalizePurchase = async () => {
     setProcessing(true)
-    
+
     try {
-      // Use the coupon if applied
-      if (appliedCoupon) {
-        await fetch("/api/cupons", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "use", code: appliedCoupon.code })
-        })
-      }
+      const session = getSession()
+      const sessionUserId = session?.userId || ""
+      const sessionEmail = session?.email || ""
+      const sessionName = session?.name || ""
 
-      // If total is 0, deliver cards immediately without PIX
-      if (total <= 0) {
-        setPaymentStatus("paid")
-        fetchDeliveredCards()
-        localStorage.removeItem("checkout_cart")
-        setProcessing(false)
-        return
-      }
-
-      // Create PIX payment
-      let sessionUserId = ""
-      let sessionEmail = ""
-      try {
-        const raw = localStorage.getItem("user_session")
-        if (raw) {
-          const s = JSON.parse(raw)
-          sessionUserId = s.userId || ""
-          sessionEmail = s.email || ""
-        }
-      } catch {}
-
-      const res = await fetch("/api/pix", {
+      // O servidor decide: paga com saldo (entrega na hora) ou gera PIX.
+      // O total, o desconto e o estoque são validados no backend.
+      const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          amount: total,
           userId: sessionUserId,
           userEmail: sessionEmail,
-          items: cartItems.map(item => ({
+          userName: sessionName,
+          couponCode: appliedCoupon?.code,
+          items: cartItems.map((item) => ({
             level: item.level,
             brand: item.brand,
             quantity: item.quantity,
-            price: item.price
-          }))
-        })
+          })),
+        }),
       })
 
       const data = await res.json()
 
-      if (data.success) {
+      if (!res.ok || !data.success) {
+        alert(data.error || "Erro ao finalizar compra")
+        setProcessing(false)
+        return
+      }
+
+      if (data.method === "balance" && data.paid) {
+        // Pago com saldo: cartões entregues imediatamente pelo servidor.
+        setDeliveredCards(data.cards || [])
+        setPaymentStatus("paid")
+        localStorage.removeItem("checkout_cart")
+      } else if (data.method === "pix") {
+        // Sem saldo: mostra o PIX. Os cartões foram reservados no servidor.
         setPixPayment(data.payment)
-      } else {
-        alert("Erro ao gerar PIX")
       }
     } catch {
       alert("Erro ao finalizar compra")

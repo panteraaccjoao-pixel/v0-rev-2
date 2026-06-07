@@ -1,25 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
-
-// In-memory storage for products (replace with database in production)
-let products: Product[] = []
-
-interface Product {
-  id: string
-  bin: string
-  fullCard: string
-  expiry: string
-  cvv: string
-  bank: string
-  type: string
-  level: string
-  price: number
-  brand: string
-  createdAt: string
-  // Additional info
-  holderName: string
-  cpf: string
-  birthDate: string
-}
+import {
+  type Product,
+  getProducts,
+  addProduct,
+  removeProductById,
+  updateProduct,
+  findProductById,
+} from "@/lib/stock-store"
+import { createOrderRecord } from "@/app/api/pedidos/route"
+import { findProfileByEmail } from "@/lib/data-store"
 
 // GET - List all products
 export async function GET(request: NextRequest) {
@@ -28,63 +17,69 @@ export async function GET(request: NextRequest) {
   const brand = searchParams.get("brand")
   const search = searchParams.get("search")
 
-  let filteredProducts = [...products]
+  let filteredProducts = [...getProducts()]
 
   if (level && level !== "Nível") {
-    filteredProducts = filteredProducts.filter(p => p.level === level)
+    filteredProducts = filteredProducts.filter((p) => p.level === level)
   }
 
   if (brand && brand !== "Bandeira") {
-    filteredProducts = filteredProducts.filter(p => p.brand.toLowerCase() === brand.toLowerCase())
+    filteredProducts = filteredProducts.filter((p) => p.brand.toLowerCase() === brand.toLowerCase())
   }
 
   if (search) {
     const searchLower = search.toLowerCase()
-    filteredProducts = filteredProducts.filter(p => 
-      p.bin.includes(search) || 
-      p.bank.toLowerCase().includes(searchLower) ||
-      p.level.toLowerCase().includes(searchLower)
+    filteredProducts = filteredProducts.filter(
+      (p) =>
+        p.bin.includes(search) ||
+        p.bank.toLowerCase().includes(searchLower) ||
+        p.level.toLowerCase().includes(searchLower),
     )
   }
 
   // Group products by BIN, level and brand for client view
-  const grouped = filteredProducts.reduce((acc, product) => {
-    const key = `${product.bin}-${product.level}-${product.brand}`
-    if (!acc[key]) {
-      acc[key] = {
-        level: product.level,
-        brand: product.brand,
-        price: product.price,
-        count: 0,
-        products: [] as { id: string }[],
-        // First product info for display
-        bin: product.bin,
-        bank: product.bank,
-        holderName: product.holderName,
-        expiry: product.expiry,
-        hasHolderData: !!(product.holderName || product.cpf || product.birthDate)
+  const grouped = filteredProducts.reduce(
+    (acc, product) => {
+      const key = `${product.bin}-${product.level}-${product.brand}`
+      if (!acc[key]) {
+        acc[key] = {
+          level: product.level,
+          brand: product.brand,
+          price: product.price,
+          count: 0,
+          products: [] as { id: string }[],
+          bin: product.bin,
+          bank: product.bank,
+          holderName: product.holderName,
+          expiry: product.expiry,
+          hasHolderData: !!(product.holderName || product.cpf || product.birthDate),
+        }
       }
-    }
-    acc[key].count++
-    acc[key].products.push({ id: product.id })
-    return acc
-  }, {} as Record<string, { 
-    level: string
-    brand: string
-    price: number
-    count: number
-    products: { id: string }[]
-    bin: string
-    bank: string
-    holderName: string
-    expiry: string
-    hasHolderData: boolean
-  }>)
+      acc[key].count++
+      acc[key].products.push({ id: product.id })
+      return acc
+    },
+    {} as Record<
+      string,
+      {
+        level: string
+        brand: string
+        price: number
+        count: number
+        products: { id: string }[]
+        bin: string
+        bank: string
+        holderName: string
+        expiry: string
+        hasHolderData: boolean
+      }
+    >,
+  )
 
   return NextResponse.json({
     products: filteredProducts,
     grouped: Object.values(grouped),
-    total: filteredProducts.length
+    total: filteredProducts.length,
   })
 }
 
@@ -92,26 +87,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const data = await request.json()
-    
-    const newProduct: Product = {
-      id: `card_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      bin: data.bin || data.fullCard?.substring(0, 6) || "",
-      fullCard: data.fullCard || "",
-      expiry: data.expiry || "",
-      cvv: data.cvv || "",
-      bank: data.bank || "",
-      type: data.type || "CREDIT",
-      level: data.level || "Standard",
-      price: parseFloat(data.price) || 0,
-      brand: data.brand || "visa",
-      createdAt: new Date().toISOString(),
-      holderName: data.holderName || "",
-      cpf: data.cpf || "",
-      birthDate: data.birthDate || ""
-    }
-
-    products.push(newProduct)
-
+    const newProduct = addProduct(data)
     return NextResponse.json({ success: true, product: newProduct })
   } catch (error) {
     console.error("Error adding product:", error)
@@ -129,12 +105,10 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "Product ID required" }, { status: 400 })
     }
 
-    const index = products.findIndex(p => p.id === id)
-    if (index === -1) {
+    const removed = removeProductById(id)
+    if (!removed) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 })
     }
-
-    products.splice(index, 1)
 
     return NextResponse.json({ success: true })
   } catch (error) {
@@ -147,119 +121,101 @@ export async function DELETE(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const data = await request.json()
-    
+
     if (!data.id) {
       return NextResponse.json({ error: "Product ID required" }, { status: 400 })
     }
 
-    const index = products.findIndex(p => p.id === data.id)
-    if (index === -1) {
+    const updated = updateProduct(data.id, data)
+    if (!updated) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 })
     }
 
-    // Update the product
-    products[index] = {
-      ...products[index],
-      bin: data.bin || products[index].bin,
-      fullCard: data.fullCard || products[index].fullCard,
-      expiry: data.expiry || products[index].expiry,
-      cvv: data.cvv || products[index].cvv,
-      bank: data.bank || products[index].bank,
-      type: data.type || products[index].type,
-      level: data.level || products[index].level,
-      price: data.price !== undefined ? parseFloat(data.price) : products[index].price,
-      brand: data.brand || products[index].brand,
-      holderName: data.holderName !== undefined ? data.holderName : products[index].holderName,
-      cpf: data.cpf !== undefined ? data.cpf : products[index].cpf,
-      birthDate: data.birthDate !== undefined ? data.birthDate : products[index].birthDate
-    }
-
-    return NextResponse.json({ success: true, product: products[index] })
+    return NextResponse.json({ success: true, product: updated })
   } catch (error) {
     console.error("Error updating product:", error)
     return NextResponse.json({ error: "Failed to update product" }, { status: 500 })
   }
 }
 
-// PATCH - Purchase a product
+// PATCH - Purchase a single product directly (compra unitária paga com saldo).
+// O fluxo principal de compra é /api/checkout. Mantido para compras avulsas.
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json()
-    const { id, action, userId, userName } = body
+    const { id, action, userId, userName, userEmail } = body
 
-    if (action === "purchase") {
-      const productIndex = products.findIndex(p => p.id === id)
-      if (productIndex === -1) {
-        return NextResponse.json(
-          { error: "Produto não encontrado ou já vendido" },
-          { status: 404 }
-        )
-      }
-
-      const product = products[productIndex]
-      
-      // Remove from available products (mark as sold)
-      products.splice(productIndex, 1)
-
-      // Create order record
-      try {
-        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-        await fetch(`${baseUrl}/api/pedidos`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            userId: userId || "user_teste_001",
-            userName: userName || "Cliente",
-            product: `${product.level} ${product.brand}`,
-            level: product.level,
-            brand: product.brand,
-            total: product.price,
-            cardData: {
-              fullCard: product.fullCard,
-              cvv: product.cvv,
-              expiry: product.expiry,
-              bin: product.bin,
-              bank: product.bank,
-              holderName: product.holderName,
-              cpf: product.cpf,
-              birthDate: product.birthDate
-            }
-          })
-        })
-      } catch (e) {
-        console.error("Error creating order:", e)
-      }
-
-      // Return full card details after purchase
-      return NextResponse.json({ 
-        success: true, 
-        card: {
-          id: product.id,
-          fullCard: product.fullCard,
-          cvv: product.cvv,
-          expiry: product.expiry,
-          bin: product.bin,
-          bank: product.bank,
-          level: product.level,
-          brand: product.brand,
-          price: product.price,
-          holderName: product.holderName,
-          cpf: product.cpf,
-          birthDate: product.birthDate
-        },
-        message: "Compra realizada com sucesso!"
-      })
+    if (action !== "purchase") {
+      return NextResponse.json({ error: "Ação inválida" }, { status: 400 })
     }
 
-    return NextResponse.json(
-      { error: "Ação inválida" },
-      { status: 400 }
-    )
+    const product = findProductById(id)
+    if (!product) {
+      return NextResponse.json({ error: "Produto não encontrado ou já vendido" }, { status: 404 })
+    }
+
+    // Paga com saldo se houver perfil e saldo suficiente.
+    const profile = userEmail ? findProfileByEmail(userEmail) : undefined
+    if (profile) {
+      const balance = Number(profile.balance ?? 0)
+      if (balance < Number(product.price ?? 0)) {
+        return NextResponse.json(
+          { error: "Saldo insuficiente", needsRecharge: true },
+          { status: 402 },
+        )
+      }
+      profile.balance = balance - Number(product.price ?? 0)
+      profile.purchases = Number(profile.purchases ?? 0) + 1
+      profile.total_spent = Number(profile.total_spent ?? 0) + Number(product.price ?? 0)
+    }
+
+    // Baixa o estoque.
+    const removed = removeProductById(id)
+    if (!removed) {
+      return NextResponse.json({ error: "Produto não encontrado ou já vendido" }, { status: 404 })
+    }
+
+    // Cria o pedido.
+    createOrderRecord({
+      userId: userId || profile?.id || "user_teste_001",
+      userName: userName || profile?.name || "Cliente",
+      product: `${removed.level} ${removed.brand}`,
+      level: removed.level,
+      brand: removed.brand,
+      total: removed.price,
+      cardData: {
+        fullCard: removed.fullCard,
+        cvv: removed.cvv,
+        expiry: removed.expiry,
+        bin: removed.bin,
+        bank: removed.bank,
+        holderName: removed.holderName,
+        cpf: removed.cpf,
+        birthDate: removed.birthDate,
+      },
+    })
+
+    return NextResponse.json({
+      success: true,
+      card: {
+        id: removed.id,
+        fullCard: removed.fullCard,
+        cvv: removed.cvv,
+        expiry: removed.expiry,
+        bin: removed.bin,
+        bank: removed.bank,
+        level: removed.level,
+        brand: removed.brand,
+        price: removed.price,
+        holderName: removed.holderName,
+        cpf: removed.cpf,
+        birthDate: removed.birthDate,
+      },
+      newBalance: profile?.balance,
+      message: "Compra realizada com sucesso!",
+    })
   } catch (error) {
     console.error("Error processing purchase:", error)
-    return NextResponse.json(
-      { error: "Erro ao processar compra" },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: "Erro ao processar compra" }, { status: 500 })
   }
 }
