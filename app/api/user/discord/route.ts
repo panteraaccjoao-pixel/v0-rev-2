@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { getInternalSecret } from "@/lib/data-store"
 
 // In-memory storage for user discord links (replace with database in production)
 const userDiscordLinks: Map<string, { discordId: string; discordUsername: string; linkedAt: string }> = new Map()
@@ -48,11 +49,14 @@ export async function POST(request: NextRequest) {
       linkedAt: new Date().toISOString()
     })
 
-    // Also update the user record with the discord ID
+    // Also update the user record with the discord ID (chamada interna autenticada)
     try {
       await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/users`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-internal-secret": getInternalSecret(),
+        },
         body: JSON.stringify({ 
           action: "set_discord", 
           email: "teste@teste.com", // Default user for now

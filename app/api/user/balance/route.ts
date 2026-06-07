@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import store, { findProfileByEmail } from "@/lib/data-store"
+import { isAuthenticatedAdmin, isInternalRequest, unauthorizedResponse } from "@/lib/admin-auth"
 
 // Helpers de saldo baseados no armazenamento local
 export async function getUserBalance(email: string): Promise<number> {
@@ -47,7 +48,11 @@ export async function GET(request: NextRequest) {
 }
 
 // POST - atualiza o saldo (operações: add, deduct, set)
+// Restrito a admin autenticado ou chamada interna (server-to-server).
 export async function POST(request: NextRequest) {
+  if (!isAuthenticatedAdmin(request) && !isInternalRequest(request)) {
+    return unauthorizedResponse()
+  }
   try {
     const { email, amount, operation } = await request.json()
 

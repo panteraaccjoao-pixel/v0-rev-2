@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import store from "@/lib/data-store"
+import { isAuthenticatedAdmin, unauthorizedResponse } from "@/lib/admin-auth"
 
 async function getConfig(key: string) {
   return store.config[key] || null
@@ -10,6 +11,9 @@ async function saveConfig(key: string, value: Record<string, any>) {
 }
 
 export async function POST(request: Request) {
+  if (!isAuthenticatedAdmin(request)) {
+    return unauthorizedResponse()
+  }
   try {
     const body = await request.json()
     const { type, config, dbConfig, gatewayConfig } = body
@@ -71,7 +75,10 @@ export async function POST(request: Request) {
   }
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  if (!isAuthenticatedAdmin(request)) {
+    return unauthorizedResponse()
+  }
   try {
     const parsedDb = await getConfig("db")
     const parsedGateway = await getConfig("gateway")

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import store from "@/lib/data-store"
+import { isAuthenticatedAdmin, unauthorizedResponse } from "@/lib/admin-auth"
 
 const DEFAULT_SETTINGS = {
   discordAuthUrl: "",
@@ -20,8 +21,11 @@ export async function GET() {
   }
 }
 
-// POST - atualiza as configurações
+// POST - atualiza as configurações (somente admin)
 export async function POST(request: NextRequest) {
+  if (!isAuthenticatedAdmin(request)) {
+    return unauthorizedResponse()
+  }
   try {
     const body = await request.json()
 

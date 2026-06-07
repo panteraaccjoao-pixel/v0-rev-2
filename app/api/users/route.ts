@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import store, { findProfileById, findProfileByEmail, type Profile } from "@/lib/data-store"
+import { isAuthenticatedAdmin, isInternalRequest, unauthorizedResponse } from "@/lib/admin-auth"
 
 interface UserView {
   id: string
@@ -27,8 +28,11 @@ function mapProfile(p: Profile): UserView {
   }
 }
 
-// GET - lista todos os usuários
-export async function GET() {
+// GET - lista todos os usuários (somente admin)
+export async function GET(request: NextRequest) {
+  if (!isAuthenticatedAdmin(request)) {
+    return unauthorizedResponse()
+  }
   try {
     const users = store.profiles.map(mapProfile)
     return NextResponse.json({
@@ -43,7 +47,11 @@ export async function GET() {
 }
 
 // POST - gerencia usuários (atualizar saldo, compras, bloqueio, discord)
+// Requer admin autenticado OU chamada interna (server-to-server).
 export async function POST(request: NextRequest) {
+  if (!isAuthenticatedAdmin(request) && !isInternalRequest(request)) {
+    return unauthorizedResponse()
+  }
   try {
     const data = await request.json()
 
@@ -99,8 +107,11 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// DELETE - remove um usuário
+// DELETE - remove um usuário (somente admin)
 export async function DELETE(request: NextRequest) {
+  if (!isAuthenticatedAdmin(request)) {
+    return unauthorizedResponse()
+  }
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get("id")

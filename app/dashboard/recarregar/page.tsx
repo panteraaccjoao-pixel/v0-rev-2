@@ -76,25 +76,6 @@ export default function RecarregarPage() {
     setError(null)
   }
 
-  // Credit balance after payment confirmed
-  const creditBalance = useCallback(async (amount: number) => {
-    try {
-      await fetch("/api/users", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "update_balance",
-          email: "teste@teste.com",
-          amount: amount,
-        }),
-      })
-      setCreditedAmount(amount)
-      setCurrentBalance((prev) => prev + amount)
-    } catch (err) {
-      console.error("Error crediting balance:", err)
-    }
-  }, [])
-
   // Poll for payment status
   const checkPaymentStatus = useCallback(async () => {
     if (!pixPayment) return
@@ -105,14 +86,17 @@ export default function RecarregarPage() {
 
       if (data.status === "paid") {
         setPaymentStatus("paid")
-        creditBalance(pixPayment.amount)
+        // O saldo é creditado no servidor ao confirmar o pagamento.
+        // Aqui apenas refletimos visualmente o valor recarregado.
+        setCreditedAmount(pixPayment.amount)
+        setCurrentBalance((prev) => prev + pixPayment.amount)
       } else if (data.status === "expired") {
         setPaymentStatus("expired")
       }
     } catch (err) {
       console.error("Error checking payment:", err)
     }
-  }, [pixPayment, creditBalance])
+  }, [pixPayment])
 
   useEffect(() => {
     if (pixPayment && paymentStatus === "pending") {

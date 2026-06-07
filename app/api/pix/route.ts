@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { checkRateLimit, getClientIP } from "@/lib/rate-limit"
 import { rateLimitResponse } from "@/lib/security"
 import { createPix } from "@/lib/pix-gateway"
+import { addBalance } from "@/app/api/user/balance/route"
+import { isAuthenticatedAdmin, isInternalRequest, unauthorizedResponse } from "@/lib/admin-auth"
 
 // In-memory storage for PIX payments
 interface PixPayment {
@@ -12,6 +14,9 @@ interface PixPayment {
   qrCodeUrl: string
   createdAt: Date
   expiresAt: Date
+  userEmail?: string
+  userId?: string
+  credited?: boolean
   items: Array<{
     level: string
     brand: string
@@ -56,6 +61,9 @@ export async function POST(request: NextRequest) {
       qrCodeUrl,
       createdAt: new Date(),
       expiresAt: pix.expiresAt ? new Date(pix.expiresAt) : new Date(Date.now() + 30 * 60 * 1000),
+      userEmail: userEmail ? String(userEmail).toLowerCase() : undefined,
+      userId: userId || undefined,
+      credited: false,
       items: items || []
     }
 
@@ -110,8 +118,13 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// PATCH - Simulate payment confirmation (for testing)
+// PATCH - Confirma/cancela pagamento.
+// Restrito a admin autenticado ou chamada interna (ex: webhook da gateway).
+// O crédito de saldo acontece aqui no servidor, nunca no client.
 export async function PATCH(request: NextRequest) {
+  if (!isAuthenticatedAdmin(request) && !isInternalRequest(request)) {
+    return unauthorizedResponse()
+  }
   try {
     const data = await request.json()
     const { id, action } = data
@@ -128,6 +141,11 @@ export async function PATCH(request: NextRequest) {
 
     if (action === "confirm") {
       payment.status = "paid"
+      // Credita o saldo do dono do pagamento apenas uma vez
+      if (!payment.credited && payment.userEmail) {
+        await addBalance(payment.userEmail, payment.amount)
+        payment.credited = true
+      }
       return NextResponse.json({ success: true, status: "paid" })
     }
 

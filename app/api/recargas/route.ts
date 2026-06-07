@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
+import { getInternalSecret } from "@/lib/data-store"
+import { isAuthenticatedAdmin, unauthorizedResponse } from "@/lib/admin-auth"
 
 // In-memory storage for recharges (replace with database in production)
 let recharges: Recharge[] = []
@@ -66,6 +68,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (data.action === "approve") {
+      if (!isAuthenticatedAdmin(request)) return unauthorizedResponse()
       const recharge = recharges.find(r => r.id === data.rechargeId)
       if (!recharge) {
         return NextResponse.json({ error: "Recharge not found" }, { status: 404 })
@@ -74,10 +77,13 @@ export async function POST(request: NextRequest) {
       recharge.status = "approved"
       recharge.approvedAt = new Date().toISOString()
 
-      // Update user balance via the users API
+      // Update user balance via the users API (chamada interna autenticada)
       await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/users`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-internal-secret": getInternalSecret(),
+        },
         body: JSON.stringify({
           action: "update_balance",
           userId: recharge.userId,
@@ -89,6 +95,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (data.action === "reject") {
+      if (!isAuthenticatedAdmin(request)) return unauthorizedResponse()
       const recharge = recharges.find(r => r.id === data.rechargeId)
       if (!recharge) {
         return NextResponse.json({ error: "Recharge not found" }, { status: 404 })
@@ -105,8 +112,9 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// DELETE - Remove recharge
+// DELETE - Remove recharge (somente admin)
 export async function DELETE(request: NextRequest) {
+  if (!isAuthenticatedAdmin(request)) return unauthorizedResponse()
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get("id")

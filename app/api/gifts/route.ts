@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { isAuthenticatedAdmin, unauthorizedResponse } from "@/lib/admin-auth"
 
 // Armazenamento em memória dos gifts (compartilhado entre requisições).
 // ATENÇÃO: volátil — reinicia quando o servidor reinicia.
@@ -38,8 +39,11 @@ function generateCode() {
   return `GIFT-${result}`
 }
 
-// Lista todos os gifts
-export async function GET() {
+// Lista todos os gifts (somente admin — expõe códigos)
+export async function GET(request: Request) {
+  if (!isAuthenticatedAdmin(request)) {
+    return unauthorizedResponse()
+  }
   try {
     const store = getStore()
     return NextResponse.json({
@@ -52,8 +56,11 @@ export async function GET() {
   }
 }
 
-// Cria um ou mais gifts
+// Cria um ou mais gifts (somente admin)
 export async function POST(request: Request) {
+  if (!isAuthenticatedAdmin(request)) {
+    return unauthorizedResponse()
+  }
   try {
     const body = await request.json()
     const value = Number.parseFloat(body.value)
@@ -89,8 +96,11 @@ export async function POST(request: Request) {
   }
 }
 
-// Exclui um gift
+// Exclui um gift (somente admin)
 export async function DELETE(request: Request) {
+  if (!isAuthenticatedAdmin(request)) {
+    return unauthorizedResponse()
+  }
   try {
     const { searchParams } = new URL(request.url)
     const giftId = searchParams.get("id")

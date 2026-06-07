@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import crypto from "crypto"
-import store from "@/lib/data-store"
+import store, { verifyPassword, createAdminToken, revokeAdminToken } from "@/lib/data-store"
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,12 +13,11 @@ export async function POST(request: NextRequest) {
     }
 
     const normalizedEmail = String(email).toLowerCase()
-    const isValid = store.admins.some(
-      (a) => a.email.toLowerCase() === normalizedEmail && a.password === password
-    )
+    const admin = store.admins.find((a) => a.email.toLowerCase() === normalizedEmail)
+    const isValid = !!admin && verifyPassword(password, admin.password)
 
     if (isValid) {
-      const token = crypto.randomBytes(32).toString("hex")
+      const token = createAdminToken()
 
       const response = NextResponse.json({
         success: true,
@@ -50,7 +48,12 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function DELETE() {
+export async function DELETE(request: NextRequest) {
+  const cookieHeader = request.headers.get("cookie") || ""
+  const match = cookieHeader.match(/(?:^|;\s*)admin_token=([^;]+)/)
+  const token = match ? decodeURIComponent(match[1]) : null
+  revokeAdminToken(token)
+
   const response = NextResponse.json({
     success: true,
     message: "Logout realizado com sucesso",
