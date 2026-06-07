@@ -34,10 +34,28 @@ const GATEWAY_URLS: Record<string, { sandbox: string; production: string }> = {
     sandbox: "https://api.pushinpay.com.br/api/pix",
     production: "https://api.pushinpay.com.br/api/pix",
   },
+  velorapay: {
+    sandbox: "https://api.velorapay.com",
+    production: "https://api.velorapay.com",
+  },
 }
 
-// Get gateway config from admin panel (banco de dados)
+// Get gateway config from admin panel (banco de dados) ou variáveis de ambiente
 async function getGatewayConfig() {
+  // Prioridade: variáveis de ambiente da VeloraPay (modo de teste/produção configurado por env)
+  const veloraPublic = process.env.VELORAPAY_API_KEYPUBLIC
+  const veloraSecret = process.env.VELORAPAY_API_KEYSECRET
+
+  if (veloraPublic && veloraSecret) {
+    return {
+      gateway: "velorapay",
+      environment: process.env.VELORAPAY_ENVIRONMENT || "sandbox",
+      apiKey: veloraPublic,
+      secretKey: veloraSecret,
+    }
+  }
+
+  // Caso contrário, usa a configuração salva pelo painel admin
   return getGatewayConfigRaw()
 }
 
@@ -125,6 +143,8 @@ async function generatePixFromGateway({
       return await openPixCreatePix({ amount, userId, userEmail, config, baseUrl })
     case "pushinpay":
       return await pushinPayCreatePix({ amount, userId, userEmail, config, baseUrl })
+    case "velorapay":
+      return await veloraPayCreatePix({ amount, userId, userEmail, config, baseUrl })
     default:
       return await genericGatewayCreatePix({ amount, userId, userEmail, config, baseUrl })
   }
@@ -261,6 +281,78 @@ async function pushinPayCreatePix({ amount, userId, userEmail, config, baseUrl }
     expiresAt: data.expiration_date,
     txId: data.id,
     gatewayId: data.id,
+  }
+}
+
+// VeloraPay integration
+// Autentica via Basic Auth (publicKey:secretKey) e cria uma cobrança PIX (cash-in).
+// O parsing da resposta é flexível para suportar variações de nomes de campos.
+async function veloraPayCreatePix({ amount, userId, userEmail, config, baseUrl }: any) {
+  const publicKey = config.apiKey
+  const secretKey = config.secretKey || ""
+
+  // Basic Auth com as duas chaves (padrão comum em gateways PIX)
+  const basicToken = Buffer.from(`${publicKey}:${secretKey}`).toString("base64")
+
+  const response = await fetch(`${baseUrl}/v1/transactions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Accept": "application/json",
+      "Authorization": `Basic ${basicToken}`,
+      // Alguns gateways também aceitam as chaves em headers próprios
+      "x-public-key": publicKey,
+      "x-secret-key": secretKey,
+    },
+    body: JSON.stringify({
+      paymentMethod: "pix",
+      amount: Math.round(amount * 100), // valor em centavos
+      currency: "BRL",
+      description: "Recarga REV SYSTEM",
+      externalRef: userId || `REV-${Date.now()}`,
+      customer: {
+        email: userEmail || "cliente@email.com",
+      },
+    }),
+  })
+
+  const data = await response.json().catch(() => ({}))
+
+  if (!response.ok) {
+    throw new Error(data?.message || data?.error || "Erro na VeloraPay")
+  }
+
+  // Procura o copia-e-cola e o QR Code em vários formatos possíveis
+  const pix = data.pix || data.charge || data.data || data.transaction || data
+  const pixCode =
+    pix.qrcode || pix.qrCode || pix.copyPaste || pix.pixCopiaECola ||
+    pix.brCode || pix.emv || pix.payload || data.qrcode
+
+  let qrCodeBase64 =
+    pix.qrCodeBase64 || pix.qrCodeImage || pix.qr_code_base64 ||
+    pix.qrCodeImageUrl || data.qrCodeBase64 || ""
+
+  // Se a gateway não retornar a imagem, geramos o QR localmente a partir do copia-e-cola
+  if (!qrCodeBase64 && pixCode) {
+    try {
+      qrCodeBase64 = await QRCode.toDataURL(pixCode, {
+        width: 300,
+        margin: 1,
+        errorCorrectionLevel: "M",
+      })
+    } catch (err) {
+      console.error("[v0] Erro ao gerar QR VeloraPay:", err)
+    }
+  }
+
+  return {
+    success: true,
+    pixCode,
+    qrCodeBase64,
+    expiresAt: pix.expiresAt || pix.expiration_date || pix.dueDate ||
+      new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+    txId: pix.id || pix.transactionId || pix.externalRef || `REV${Date.now()}`,
+    gatewayId: pix.id,
   }
 }
 
