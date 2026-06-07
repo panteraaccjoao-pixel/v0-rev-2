@@ -64,11 +64,18 @@ export async function GET(request: NextRequest) {
 
     let filteredOrders = orders
 
-    // Filter by userId or email if provided
-    if (userId) {
-      filteredOrders = orders.filter(o => o.userId === userId)
-    } else if (userEmail) {
-      filteredOrders = orders.filter(o => o.userId === userEmail || o.userName.toLowerCase().includes(userEmail.toLowerCase()))
+    // Casa por userId OU email, pois o pedido pode ter sido salvo com o id do
+    // perfil ou com o próprio email como identificador do usuário.
+    if (userId || userEmail) {
+      const id = userId?.toLowerCase()
+      const email = userEmail?.toLowerCase()
+      filteredOrders = orders.filter((o) => {
+        const orderUser = o.userId?.toLowerCase()
+        return (
+          (id && orderUser === id) ||
+          (email && orderUser === email)
+        )
+      })
     }
 
     // Sort by date (newest first)
