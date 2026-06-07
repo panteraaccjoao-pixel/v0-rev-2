@@ -34,6 +34,22 @@ const store: DataStore =
     admins: [{ email: "admin@admin.com", password: "admin123" }],
   })
 
+// Garante que o usuário de teste exista mesmo após hot-reloads.
+if (!store.profiles.some((p) => p.email === "teste@teste.com")) {
+  store.profiles.unshift({
+    id: "user_seed_teste",
+    name: "Teste",
+    email: "teste@teste.com",
+    password: "teste123",
+    created_at: new Date().toISOString(),
+    balance: 0,
+    total_spent: 0,
+    purchases: 0,
+    status: "active",
+    discord_id: "",
+  })
+}
+
 export default store
 
 export function findProfileByEmail(email: string): Profile | undefined {
