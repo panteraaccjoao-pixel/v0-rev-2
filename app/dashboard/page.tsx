@@ -43,7 +43,13 @@ export default function DashboardPage() {
 
   const fetchBalance = useCallback(async () => {
     try {
-      const res = await fetch("/api/user/balance")
+      let email = ""
+      try {
+        const raw = localStorage.getItem("user_session")
+        email = raw ? JSON.parse(raw).email || "" : ""
+      } catch {}
+
+      const res = await fetch(`/api/user/balance?email=${encodeURIComponent(email)}`)
       if (res.ok) {
         const data = await res.json()
         setUserBalance(data.balance || 0)

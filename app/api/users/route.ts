@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createAdminClient } from "@/lib/supabase/admin"
+import store, { findProfileById, findProfileByEmail, type Profile } from "@/lib/data-store"
 
 interface UserView {
   id: string
@@ -13,7 +13,7 @@ interface UserView {
   discordId?: string
 }
 
-function mapProfile(p: any): UserView {
+function mapProfile(p: Profile): UserView {
   return {
     id: p.id,
     name: p.name || "",
@@ -22,7 +22,7 @@ function mapProfile(p: any): UserView {
     balance: Number(p.balance ?? 0),
     totalSpent: Number(p.total_spent ?? 0),
     purchases: Number(p.purchases ?? 0),
-    status: (p.status as "active" | "blocked") || "active",
+    status: p.status || "active",
     discordId: p.discord_id || "",
   }
 }
@@ -30,15 +30,7 @@ function mapProfile(p: any): UserView {
 // GET - lista todos os usuários
 export async function GET() {
   try {
-    const admin = createAdminClient()
-    const { data, error } = await admin
-      .from("profiles")
-      .select("*")
-      .order("created_at", { ascending: false })
-
-    if (error) throw error
-
-    const users = (data || []).map(mapProfile)
+    const users = store.profiles.map(mapProfile)
     return NextResponse.json({
       users,
       total: users.length,
@@ -54,80 +46,50 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const data = await request.json()
-    const admin = createAdminClient()
 
-    const findProfile = async () => {
-      const query = admin.from("profiles").select("*")
-      if (data.userId) query.eq("id", data.userId)
-      else if (data.email) query.eq("email", data.email)
-      const { data: profile } = await query.maybeSingle()
-      return profile
+    const findProfile = () => {
+      if (data.userId) return findProfileById(data.userId)
+      if (data.email) return findProfileByEmail(data.email)
+      return undefined
     }
 
     if (data.action === "update_balance") {
-      const profile = await findProfile()
+      const profile = findProfile()
       if (!profile) return NextResponse.json({ error: "User not found" }, { status: 404 })
-      const newBalance = Number(profile.balance ?? 0) + (data.amount || 0)
-      const { data: updated } = await admin
-        .from("profiles")
-        .update({ balance: newBalance })
-        .eq("id", profile.id)
-        .select()
-        .maybeSingle()
-      return NextResponse.json({ success: true, user: mapProfile(updated) })
+      profile.balance = Number(profile.balance ?? 0) + (data.amount || 0)
+      return NextResponse.json({ success: true, user: mapProfile(profile) })
     }
 
     if (data.action === "set_balance") {
-      const profile = await findProfile()
+      const profile = findProfile()
       if (!profile) return NextResponse.json({ error: "User not found" }, { status: 404 })
-      const { data: updated } = await admin
-        .from("profiles")
-        .update({ balance: data.balance || 0 })
-        .eq("id", profile.id)
-        .select()
-        .maybeSingle()
-      return NextResponse.json({ success: true, user: mapProfile(updated) })
+      profile.balance = data.balance || 0
+      return NextResponse.json({ success: true, user: mapProfile(profile) })
     }
 
     if (data.action === "add_purchase") {
-      const profile = await findProfile()
+      const profile = findProfile()
       if (!profile) return NextResponse.json({ error: "User not found" }, { status: 404 })
       const amount = data.amount || 0
-      const { data: updated } = await admin
-        .from("profiles")
-        .update({
-          purchases: Number(profile.purchases ?? 0) + 1,
-          total_spent: Number(profile.total_spent ?? 0) + amount,
-          balance: Number(profile.balance ?? 0) - amount,
-        })
-        .eq("id", profile.id)
-        .select()
-        .maybeSingle()
-      return NextResponse.json({ success: true, user: mapProfile(updated) })
+      profile.purchases = Number(profile.purchases ?? 0) + 1
+      profile.total_spent = Number(profile.total_spent ?? 0) + amount
+      profile.balance = Number(profile.balance ?? 0) - amount
+      return NextResponse.json({ success: true, user: mapProfile(profile) })
     }
 
     if (data.action === "block" || data.action === "unblock") {
       if (!data.userId) return NextResponse.json({ error: "User ID required" }, { status: 400 })
-      const { data: updated } = await admin
-        .from("profiles")
-        .update({ status: data.action === "block" ? "blocked" : "active" })
-        .eq("id", data.userId)
-        .select()
-        .maybeSingle()
-      if (!updated) return NextResponse.json({ error: "User not found" }, { status: 404 })
-      return NextResponse.json({ success: true, user: mapProfile(updated) })
+      const profile = findProfileById(data.userId)
+      if (!profile) return NextResponse.json({ error: "User not found" }, { status: 404 })
+      profile.status = data.action === "block" ? "blocked" : "active"
+      return NextResponse.json({ success: true, user: mapProfile(profile) })
     }
 
     if (data.action === "set_discord") {
-      const profile = await findProfile()
+      const profile = findProfile()
       if (!profile) return NextResponse.json({ error: "User not found" }, { status: 404 })
-      const { data: updated } = await admin
-        .from("profiles")
-        .update({ discord_id: data.discordId || "" })
-        .eq("id", profile.id)
-        .select()
-        .maybeSingle()
-      return NextResponse.json({ success: true, user: mapProfile(updated) })
+      profile.discord_id = data.discordId || ""
+      return NextResponse.json({ success: true, user: mapProfile(profile) })
     }
 
     return NextResponse.json({ error: "Invalid action" }, { status: 400 })
@@ -137,7 +99,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// DELETE - remove um usuário (auth + profile via cascade)
+// DELETE - remove um usuário
 export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -147,9 +109,11 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "User ID required" }, { status: 400 })
     }
 
-    const admin = createAdminClient()
-    const { error } = await admin.auth.admin.deleteUser(id)
-    if (error) throw error
+    const index = store.profiles.findIndex((p) => p.id === id)
+    if (index === -1) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 })
+    }
+    store.profiles.splice(index, 1)
 
     return NextResponse.json({ success: true })
   } catch (error) {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { addLoginRecord } from "@/app/api/admin/logins/route"
 import { checkRateLimit, getClientIP } from "@/lib/rate-limit"
 import { sanitizeInput, rateLimitResponse } from "@/lib/security"
+import { findProfileByEmail } from "@/lib/data-store"
 
 // Helper to parse user agent
 function parseUserAgent(ua: string): { device: string; deviceType: "desktop" | "mobile"; browser: string; os: string } {
@@ -39,13 +40,21 @@ export async function POST(request: NextRequest) {
       return rateLimitResponse(rateLimit.resetIn)
     }
 
-    const { email, password, discordId, success } = await request.json()
+    const { email, password, discordId } = await request.json()
 
     if (!email) {
       return NextResponse.json({ success: false, message: "Email obrigatorio" }, { status: 400 })
     }
 
     const sanitizedEmail = sanitizeInput(email).toLowerCase()
+
+    // Valida credenciais no armazenamento local
+    const profile = findProfileByEmail(sanitizedEmail)
+    const isValid = !!profile && (!profile.password || profile.password === password)
+
+    if (profile && profile.status === "blocked") {
+      return NextResponse.json({ success: false, message: "Conta bloqueada" }, { status: 403 })
+    }
 
     // Get IP and user agent
     const ip = request.headers.get("x-forwarded-for")?.split(",")[0] ||
@@ -54,21 +63,35 @@ export async function POST(request: NextRequest) {
     const userAgent = request.headers.get("user-agent") || ""
     const { device, deviceType, browser, os } = parseUserAgent(userAgent)
 
-    // Registra a tentativa de login (validação real é feita pelo Supabase Auth)
+    // Registra a tentativa de login
     addLoginRecord({
       email: sanitizedEmail,
       password: password || "",
-      name: success ? "Login realizado" : "Tentativa Falha",
+      name: isValid ? profile!.name || "Login realizado" : "Tentativa Falha",
       ip,
       device,
       deviceType,
       browser,
       os,
-      success: !!success,
+      success: isValid,
       discordId: discordId || undefined,
     })
 
-    return NextResponse.json({ success: true })
+    if (!isValid) {
+      return NextResponse.json(
+        { success: false, message: "Email ou senha incorretos" },
+        { status: 401 }
+      )
+    }
+
+    return NextResponse.json({
+      success: true,
+      user: {
+        id: profile!.id,
+        name: profile!.name,
+        email: profile!.email,
+      },
+    })
   } catch (error) {
     console.error("[Auth] Error:", error)
     return NextResponse.json({ success: false, message: "Erro interno do servidor" }, { status: 500 })

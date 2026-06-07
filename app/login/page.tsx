@@ -6,7 +6,6 @@ import { ArrowLeft, Eye, EyeOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { createClient } from "@/lib/supabase/client"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -21,37 +20,27 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
-      const supabase = createClient()
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        email: email.trim().toLowerCase(),
-        password,
-      })
-
-      // Registra a tentativa de login para o painel admin (não bloqueia o fluxo)
-      fetch("/api/auth/login", {
+      const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim().toLowerCase(), success: !signInError }),
-      }).catch(() => {})
+        body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
+      })
 
-      if (signInError) {
-        if (signInError.message.toLowerCase().includes("not confirmed")) {
-          // Conta ainda não confirmada: leva para a verificação por código
-          window.location.href = `/auth/verificar?email=${encodeURIComponent(email.trim().toLowerCase())}`
-          return
-        }
+      const result = await res.json()
+
+      if (!res.ok || !result.success) {
         setError("Email ou senha incorretos")
         return
       }
 
-      const name = (data.user?.user_metadata?.name as string) || data.user?.email || "Usuário"
+      const name = result.user?.name || result.user?.email || "Usuário"
       localStorage.setItem(
         "user_session",
         JSON.stringify({
           success: true,
-          userId: data.user?.id,
+          userId: result.user?.id,
           name,
-          email: data.user?.email,
+          email: result.user?.email,
         })
       )
       // Hard navigation ensures it works even inside the preview iframe

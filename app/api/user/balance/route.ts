@@ -1,52 +1,44 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
-import { createAdminClient } from "@/lib/supabase/admin"
+import store, { findProfileByEmail } from "@/lib/data-store"
 
-// Helpers de saldo baseados no Supabase (server-side, usam service role)
+// Helpers de saldo baseados no armazenamento local
 export async function getUserBalance(email: string): Promise<number> {
-  const admin = createAdminClient()
-  const { data } = await admin.from("profiles").select("balance").eq("email", email).maybeSingle()
-  return Number(data?.balance ?? 0)
+  const profile = findProfileByEmail(email)
+  return Number(profile?.balance ?? 0)
 }
 
 export async function setUserBalance(email: string, balance: number): Promise<void> {
-  const admin = createAdminClient()
-  await admin.from("profiles").update({ balance }).eq("email", email)
+  const profile = findProfileByEmail(email)
+  if (profile) profile.balance = balance
 }
 
 export async function deductBalance(email: string, amount: number): Promise<boolean> {
-  const admin = createAdminClient()
-  const { data } = await admin.from("profiles").select("balance").eq("email", email).maybeSingle()
-  const current = Number(data?.balance ?? 0)
-  if (current < amount) return false
-  await admin.from("profiles").update({ balance: current - amount }).eq("email", email)
+  const profile = findProfileByEmail(email)
+  if (!profile) return false
+  if (Number(profile.balance ?? 0) < amount) return false
+  profile.balance = Number(profile.balance ?? 0) - amount
   return true
 }
 
 export async function addBalance(email: string, amount: number): Promise<void> {
-  const admin = createAdminClient()
-  const { data } = await admin.from("profiles").select("balance").eq("email", email).maybeSingle()
-  const current = Number(data?.balance ?? 0)
-  await admin.from("profiles").update({ balance: current + amount }).eq("email", email)
+  const profile = findProfileByEmail(email)
+  if (profile) profile.balance = Number(profile.balance ?? 0) + amount
 }
 
-// GET - retorna o saldo do usuário autenticado
-export async function GET() {
+// GET - retorna o saldo do usuário (email via query param)
+export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    const email = request.nextUrl.searchParams.get("email")?.toLowerCase()
 
-    if (!user) {
-      return NextResponse.json({ error: "Não autenticado" }, { status: 401 })
+    if (!email) {
+      return NextResponse.json({ balance: 0, timestamp: new Date().toISOString() })
     }
 
-    const { data } = await supabase.from("profiles").select("balance").eq("id", user.id).maybeSingle()
+    const profile = findProfileByEmail(email)
 
     return NextResponse.json({
-      balance: Number(data?.balance ?? 0),
-      email: user.email,
+      balance: Number(profile?.balance ?? 0),
+      email,
       timestamp: new Date().toISOString(),
     })
   } catch {
@@ -63,12 +55,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Email e valor são obrigatórios" }, { status: 400 })
     }
 
-    const admin = createAdminClient()
-    const { data: profile } = await admin
-      .from("profiles")
-      .select("id, balance")
-      .eq("email", email)
-      .maybeSingle()
+    const profile = findProfileByEmail(String(email).toLowerCase())
 
     if (!profile) {
       return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 })
@@ -88,7 +75,7 @@ export async function POST(request: NextRequest) {
       newBalance = amount
     }
 
-    await admin.from("profiles").update({ balance: newBalance }).eq("id", profile.id)
+    profile.balance = newBalance
 
     return NextResponse.json({ success: true, balance: newBalance, email })
   } catch {

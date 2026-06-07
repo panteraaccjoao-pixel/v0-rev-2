@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import crypto from "crypto"
-import { createAdminClient } from "@/lib/supabase/admin"
+import store from "@/lib/data-store"
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,21 +13,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const admin = createAdminClient()
-    const { data: isValid, error } = await admin.rpc("verify_admin", {
-      p_email: String(email).toLowerCase(),
-      p_password: password,
-    })
+    const normalizedEmail = String(email).toLowerCase()
+    const isValid = store.admins.some(
+      (a) => a.email.toLowerCase() === normalizedEmail && a.password === password
+    )
 
-    if (error) {
-      console.error("[Admin Auth] RPC error:", error)
-      return NextResponse.json(
-        { success: false, message: "Erro interno do servidor" },
-        { status: 500 }
-      )
-    }
-
-    if (isValid === true) {
+    if (isValid) {
       const token = crypto.randomBytes(32).toString("hex")
 
       const response = NextResponse.json({

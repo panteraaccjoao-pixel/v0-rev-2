@@ -1,17 +1,12 @@
 import { NextResponse } from "next/server"
-import { createAdminClient } from "@/lib/supabase/admin"
+import store from "@/lib/data-store"
 
 async function getConfig(key: string) {
-  const admin = createAdminClient()
-  const { data } = await admin.from("app_config").select("value").eq("key", key).maybeSingle()
-  return (data?.value as Record<string, any>) || null
+  return store.config[key] || null
 }
 
 async function saveConfig(key: string, value: Record<string, any>) {
-  const admin = createAdminClient()
-  await admin
-    .from("app_config")
-    .upsert({ key, value, updated_at: new Date().toISOString() })
+  store.config[key] = { ...value, updated_at: new Date().toISOString() }
 }
 
 export async function POST(request: Request) {

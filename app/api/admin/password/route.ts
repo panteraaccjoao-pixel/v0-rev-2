@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createAdminClient } from "@/lib/supabase/admin"
+import store from "@/lib/data-store"
 
 export async function POST(request: NextRequest) {
   try {
@@ -28,22 +28,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const admin = createAdminClient()
-    const { data: success, error } = await admin.rpc("change_admin_password", {
-      p_email: String(email).toLowerCase(),
-      p_current_password: currentPassword,
-      p_new_password: newPassword,
-    })
+    const normalizedEmail = String(email).toLowerCase()
+    const admin = store.admins.find(
+      (a) => a.email.toLowerCase() === normalizedEmail && a.password === currentPassword
+    )
 
-    if (error) {
-      console.error("[Admin Password] RPC error:", error)
-      return NextResponse.json(
-        { success: false, message: "Erro interno do servidor" },
-        { status: 500 }
-      )
-    }
-
-    if (success === true) {
+    if (admin) {
+      admin.password = newPassword
       return NextResponse.json({
         success: true,
         message: "Senha alterada com sucesso",
