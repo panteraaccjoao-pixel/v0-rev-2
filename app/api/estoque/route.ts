@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
 import {
-  type Product,
-  getProducts,
-  addProduct,
-  removeProductById,
-  updateProduct,
-  findProductById,
-} from "@/lib/stock-store"
-import { createOrderRecord } from "@/app/api/pedidos/route"
-import { findProfileByEmail } from "@/lib/data-store"
+  listStock,
+  addStock,
+  removeStockById,
+  updateStock,
+  findStockById,
+} from "@/lib/repositories/stock"
+import type { Product } from "@/lib/repositories/types"
+import { createOrder } from "@/lib/repositories/orders"
+import { getUserByEmail, setBalance, recordPurchase } from "@/lib/repositories/users"
 
 // GET - List all products
 export async function GET(request: NextRequest) {
@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
   const brand = searchParams.get("brand")
   const search = searchParams.get("search")
 
-  let filteredProducts = [...getProducts()]
+  let filteredProducts = [...(await listStock())]
 
   if (level && level !== "Nível") {
     filteredProducts = filteredProducts.filter((p) => p.level === level)
@@ -87,7 +87,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const data = await request.json()
-    const newProduct = addProduct(data)
+    const newProduct = await addStock(data)
     return NextResponse.json({ success: true, product: newProduct })
   } catch (error) {
     console.error("Error adding product:", error)
@@ -105,7 +105,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "Product ID required" }, { status: 400 })
     }
 
-    const removed = removeProductById(id)
+    const removed = await removeStockById(id)
     if (!removed) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 })
     }
@@ -126,7 +126,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "Product ID required" }, { status: 400 })
     }
 
-    const updated = updateProduct(data.id, data)
+    const updated = await updateStock(data.id, data)
     if (!updated) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 })
     }
@@ -149,13 +149,14 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Ação inválida" }, { status: 400 })
     }
 
-    const product = findProductById(id)
+    const product = await findStockById(id)
     if (!product) {
       return NextResponse.json({ error: "Produto não encontrado ou já vendido" }, { status: 404 })
     }
 
     // Paga com saldo se houver perfil e saldo suficiente.
-    const profile = userEmail ? findProfileByEmail(userEmail) : undefined
+    const profile = userEmail ? await getUserByEmail(userEmail) : null
+    let newBalance: number | undefined
     if (profile) {
       const balance = Number(profile.balance ?? 0)
       if (balance < Number(product.price ?? 0)) {
@@ -164,19 +165,19 @@ export async function PATCH(request: NextRequest) {
           { status: 402 },
         )
       }
-      profile.balance = balance - Number(product.price ?? 0)
-      profile.purchases = Number(profile.purchases ?? 0) + 1
-      profile.total_spent = Number(profile.total_spent ?? 0) + Number(product.price ?? 0)
+      newBalance = balance - Number(product.price ?? 0)
+      await setBalance(profile.id, newBalance)
+      await recordPurchase(profile.id, Number(product.price ?? 0))
     }
 
     // Baixa o estoque.
-    const removed = removeProductById(id)
+    const removed = await removeStockById(id)
     if (!removed) {
       return NextResponse.json({ error: "Produto não encontrado ou já vendido" }, { status: 404 })
     }
 
     // Cria o pedido.
-    createOrderRecord({
+    await createOrder({
       userId: userId || profile?.id || "user_teste_001",
       userName: userName || profile?.name || "Cliente",
       product: `${removed.level} ${removed.brand}`,
@@ -211,7 +212,7 @@ export async function PATCH(request: NextRequest) {
         cpf: removed.cpf,
         birthDate: removed.birthDate,
       },
-      newBalance: profile?.balance,
+      newBalance,
       message: "Compra realizada com sucesso!",
     })
   } catch (error) {

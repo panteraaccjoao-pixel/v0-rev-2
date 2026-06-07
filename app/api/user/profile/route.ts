@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { findProfileByEmail } from "@/lib/data-store"
+import { getUserByEmail, updateUser } from "@/lib/repositories/users"
 
 // GET - retorna os dados do perfil (email via query param)
 export async function GET(request: NextRequest) {
@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Email obrigatório" }, { status: 400 })
     }
 
-    const profile = findProfileByEmail(email)
+    const profile = await getUserByEmail(email)
 
     if (!profile) {
       return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 })
@@ -35,15 +35,17 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Email atual obrigatório" }, { status: 400 })
     }
 
-    const profile = findProfileByEmail(String(currentEmail).toLowerCase())
+    const profile = await getUserByEmail(String(currentEmail).toLowerCase())
 
     if (!profile) {
       return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 })
     }
 
+    const patch: { name?: string; email?: string } = {}
+
     // Atualiza o nome
     if (typeof name === "string" && name.trim()) {
-      profile.name = name.trim()
+      patch.name = name.trim()
     }
 
     // Atualiza o email (valida formato e duplicidade)
@@ -56,20 +58,22 @@ export async function PATCH(request: NextRequest) {
       }
 
       if (newEmail !== profile.email) {
-        const existing = findProfileByEmail(newEmail)
+        const existing = await getUserByEmail(newEmail)
         if (existing) {
           return NextResponse.json({ error: "Este email já está em uso" }, { status: 409 })
         }
-        profile.email = newEmail
+        patch.email = newEmail
       }
     }
+
+    const updated = (await updateUser(profile.id, patch)) || profile
 
     return NextResponse.json({
       success: true,
       profile: {
-        id: profile.id,
-        name: profile.name,
-        email: profile.email,
+        id: updated.id,
+        name: updated.name,
+        email: updated.email,
       },
     })
   } catch {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createProfile, findProfileByEmail } from "@/lib/data-store"
+import { createUser, getUserByEmail } from "@/lib/repositories/users"
 import { sanitizeInput } from "@/lib/security"
 
 export async function POST(request: NextRequest) {
@@ -23,14 +23,14 @@ export async function POST(request: NextRequest) {
     const sanitizedEmail = sanitizeInput(email).toLowerCase()
     const sanitizedName = sanitizeInput(name)
 
-    if (findProfileByEmail(sanitizedEmail)) {
+    if (await getUserByEmail(sanitizedEmail)) {
       return NextResponse.json(
         { success: false, message: "Este email já está cadastrado" },
         { status: 409 }
       )
     }
 
-    const profile = createProfile({
+    const profile = await createUser({
       name: sanitizedName,
       email: sanitizedEmail,
       password,

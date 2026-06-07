@@ -1,29 +1,33 @@
 import { NextRequest, NextResponse } from "next/server"
-import store, { findProfileByEmail } from "@/lib/data-store"
+import {
+  getUserByEmail,
+  setBalance as setBalanceById,
+  addBalance as addBalanceById,
+} from "@/lib/repositories/users"
 import { isAuthenticatedAdmin, isInternalRequest, unauthorizedResponse } from "@/lib/admin-auth"
 
-// Helpers de saldo baseados no armazenamento local
+// Helpers de saldo (por email) — reimplementados sobre o repositório de usuários.
 export async function getUserBalance(email: string): Promise<number> {
-  const profile = findProfileByEmail(email)
+  const profile = await getUserByEmail(email)
   return Number(profile?.balance ?? 0)
 }
 
 export async function setUserBalance(email: string, balance: number): Promise<void> {
-  const profile = findProfileByEmail(email)
-  if (profile) profile.balance = balance
+  const profile = await getUserByEmail(email)
+  if (profile) await setBalanceById(profile.id, balance)
 }
 
 export async function deductBalance(email: string, amount: number): Promise<boolean> {
-  const profile = findProfileByEmail(email)
+  const profile = await getUserByEmail(email)
   if (!profile) return false
   if (Number(profile.balance ?? 0) < amount) return false
-  profile.balance = Number(profile.balance ?? 0) - amount
+  await addBalanceById(profile.id, -amount)
   return true
 }
 
 export async function addBalance(email: string, amount: number): Promise<void> {
-  const profile = findProfileByEmail(email)
-  if (profile) profile.balance = Number(profile.balance ?? 0) + amount
+  const profile = await getUserByEmail(email)
+  if (profile) await addBalanceById(profile.id, amount)
 }
 
 // GET - retorna o saldo do usuário (email via query param)
@@ -35,7 +39,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ balance: 0, timestamp: new Date().toISOString() })
     }
 
-    const profile = findProfileByEmail(email)
+    const profile = await getUserByEmail(email)
 
     return NextResponse.json({
       balance: Number(profile?.balance ?? 0),
@@ -60,7 +64,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Email e valor são obrigatórios" }, { status: 400 })
     }
 
-    const profile = findProfileByEmail(String(email).toLowerCase())
+    const profile = await getUserByEmail(String(email).toLowerCase())
 
     if (!profile) {
       return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 })
@@ -80,7 +84,7 @@ export async function POST(request: NextRequest) {
       newBalance = amount
     }
 
-    profile.balance = newBalance
+    await setBalanceById(profile.id, newBalance)
 
     return NextResponse.json({ success: true, balance: newBalance, email })
   } catch {

@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { addLoginRecord } from "@/app/api/admin/logins/route"
 import { checkRateLimit, getClientIP } from "@/lib/rate-limit"
 import { sanitizeInput, rateLimitResponse } from "@/lib/security"
-import { findProfileByEmail, verifyPassword } from "@/lib/data-store"
+import { verifyPassword } from "@/lib/repositories/crypto"
+import { getUserByEmail } from "@/lib/repositories/users"
 
 // Helper to parse user agent
 function parseUserAgent(ua: string): { device: string; deviceType: "desktop" | "mobile"; browser: string; os: string } {
@@ -48,8 +49,8 @@ export async function POST(request: NextRequest) {
 
     const sanitizedEmail = sanitizeInput(email).toLowerCase()
 
-    // Valida credenciais no armazenamento local
-    const profile = findProfileByEmail(sanitizedEmail)
+    // Valida credenciais via repositório de usuários
+    const profile = await getUserByEmail(sanitizedEmail)
     const isValid = !!profile && (!profile.password || verifyPassword(password, profile.password))
 
     if (profile && profile.status === "blocked") {

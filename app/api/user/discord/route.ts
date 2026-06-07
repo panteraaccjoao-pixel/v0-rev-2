@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getInternalSecret } from "@/lib/data-store"
+import { getInternalSecret } from "@/lib/repositories/admin-session"
 
 // In-memory storage for user discord links (replace with database in production)
 const userDiscordLinks: Map<string, { discordId: string; discordUsername: string; linkedAt: string }> = new Map()

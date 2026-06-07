@@ -1,5 +1,16 @@
 import { NextRequest, NextResponse } from "next/server"
-import store, { findProfileById, findProfileByEmail, type Profile } from "@/lib/data-store"
+import {
+  listUsers,
+  getUserById,
+  getUserByEmail,
+  addBalance,
+  setBalance,
+  setStatus,
+  setDiscordId,
+  deleteUser,
+  updateUser,
+} from "@/lib/repositories/users"
+import type { Profile } from "@/lib/repositories/types"
 import { isAuthenticatedAdmin, isInternalRequest, unauthorizedResponse } from "@/lib/admin-auth"
 
 interface UserView {
@@ -34,7 +45,8 @@ export async function GET(request: NextRequest) {
     return unauthorizedResponse()
   }
   try {
-    const users = store.profiles.map(mapProfile)
+    const profiles = await listUsers()
+    const users = profiles.map(mapProfile)
     return NextResponse.json({
       users,
       total: users.length,
@@ -55,49 +67,51 @@ export async function POST(request: NextRequest) {
   try {
     const data = await request.json()
 
-    const findProfile = () => {
-      if (data.userId) return findProfileById(data.userId)
-      if (data.email) return findProfileByEmail(data.email)
-      return undefined
+    const findProfile = async (): Promise<Profile | null> => {
+      if (data.userId) return getUserById(data.userId)
+      if (data.email) return getUserByEmail(data.email)
+      return null
     }
 
     if (data.action === "update_balance") {
-      const profile = findProfile()
+      const profile = await findProfile()
       if (!profile) return NextResponse.json({ error: "User not found" }, { status: 404 })
-      profile.balance = Number(profile.balance ?? 0) + (data.amount || 0)
-      return NextResponse.json({ success: true, user: mapProfile(profile) })
+      const updated = await addBalance(profile.id, data.amount || 0)
+      return NextResponse.json({ success: true, user: mapProfile(updated!) })
     }
 
     if (data.action === "set_balance") {
-      const profile = findProfile()
+      const profile = await findProfile()
       if (!profile) return NextResponse.json({ error: "User not found" }, { status: 404 })
-      profile.balance = data.balance || 0
-      return NextResponse.json({ success: true, user: mapProfile(profile) })
+      const updated = await setBalance(profile.id, data.balance || 0)
+      return NextResponse.json({ success: true, user: mapProfile(updated!) })
     }
 
     if (data.action === "add_purchase") {
-      const profile = findProfile()
+      const profile = await findProfile()
       if (!profile) return NextResponse.json({ error: "User not found" }, { status: 404 })
       const amount = data.amount || 0
-      profile.purchases = Number(profile.purchases ?? 0) + 1
-      profile.total_spent = Number(profile.total_spent ?? 0) + amount
-      profile.balance = Number(profile.balance ?? 0) - amount
-      return NextResponse.json({ success: true, user: mapProfile(profile) })
+      const updated = await updateUser(profile.id, {
+        purchases: Number(profile.purchases ?? 0) + 1,
+        total_spent: Number(profile.total_spent ?? 0) + amount,
+        balance: Number(profile.balance ?? 0) - amount,
+      })
+      return NextResponse.json({ success: true, user: mapProfile(updated!) })
     }
 
     if (data.action === "block" || data.action === "unblock") {
       if (!data.userId) return NextResponse.json({ error: "User ID required" }, { status: 400 })
-      const profile = findProfileById(data.userId)
+      const profile = await getUserById(data.userId)
       if (!profile) return NextResponse.json({ error: "User not found" }, { status: 404 })
-      profile.status = data.action === "block" ? "blocked" : "active"
-      return NextResponse.json({ success: true, user: mapProfile(profile) })
+      const updated = await setStatus(profile.id, data.action === "block" ? "blocked" : "active")
+      return NextResponse.json({ success: true, user: mapProfile(updated!) })
     }
 
     if (data.action === "set_discord") {
-      const profile = findProfile()
+      const profile = await findProfile()
       if (!profile) return NextResponse.json({ error: "User not found" }, { status: 404 })
-      profile.discord_id = data.discordId || ""
-      return NextResponse.json({ success: true, user: mapProfile(profile) })
+      const updated = await setDiscordId(profile.id, data.discordId || "")
+      return NextResponse.json({ success: true, user: mapProfile(updated!) })
     }
 
     return NextResponse.json({ error: "Invalid action" }, { status: 400 })
@@ -120,11 +134,10 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "User ID required" }, { status: 400 })
     }
 
-    const index = store.profiles.findIndex((p) => p.id === id)
-    if (index === -1) {
+    const removed = await deleteUser(id)
+    if (!removed) {
       return NextResponse.json({ error: "User not found" }, { status: 404 })
     }
-    store.profiles.splice(index, 1)
 
     return NextResponse.json({ success: true })
   } catch (error) {

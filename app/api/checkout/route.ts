@@ -2,13 +2,10 @@ import { NextRequest, NextResponse } from "next/server"
 import { checkRateLimit, getClientIP } from "@/lib/rate-limit"
 import { rateLimitResponse } from "@/lib/security"
 import { createPix } from "@/lib/pix-gateway"
-import { findProfileByEmail } from "@/lib/data-store"
-import {
-  type Product,
-  findMatchingProducts,
-  removeProductById,
-} from "@/lib/stock-store"
-import { addPixPayment, type PixPayment } from "@/lib/pix-store"
+import { getUserByEmail, setBalance } from "@/lib/repositories/users"
+import { findMatchingStock, removeStockById } from "@/lib/repositories/stock"
+import { addPixPayment } from "@/lib/repositories/pix"
+import type { Product, PixPayment } from "@/lib/repositories/types"
 import { validateCouponServer, useCouponServer } from "@/app/api/cupons/route"
 import { fulfillDelivery } from "@/lib/fulfillment"
 
@@ -51,9 +48,8 @@ export async function POST(request: NextRequest) {
     const usedIds = new Set<string>()
 
     for (const item of items) {
-      const available = findMatchingProducts(item.level, item.brand).filter(
-        (p) => !usedIds.has(p.id),
-      )
+      const matching = await findMatchingStock(item.level, item.brand)
+      const available = matching.filter((p) => !usedIds.has(p.id))
       const qty = Math.max(1, Number(item.quantity) || 1)
 
       if (available.length < qty) {
@@ -83,18 +79,18 @@ export async function POST(request: NextRequest) {
 
     const total = Math.max(0, Math.round((subtotal - discountAmount) * 100) / 100)
 
-    const profile = userEmail ? findProfileByEmail(userEmail) : undefined
+    const profile = userEmail ? await getUserByEmail(userEmail) : null
     const balance = Number(profile?.balance ?? 0)
 
     // 3. Pagamento com saldo (cobre total, inclusive total = 0).
     if (profile && balance >= total) {
       // Desconta o saldo.
-      profile.balance = balance - total
+      await setBalance(profile.id, balance - total)
 
       // Baixa o estoque (remove os cartões vendidos).
       const removed: Product[] = []
       for (const card of selectedCards) {
-        const r = removeProductById(card.id)
+        const r = await removeStockById(card.id)
         if (r) removed.push(r)
       }
 
@@ -102,7 +98,7 @@ export async function POST(request: NextRequest) {
       if (validCoupon) useCouponServer(validCoupon.code)
 
       // Entrega: cria pedidos e atualiza estatísticas.
-      const delivered = fulfillDelivery({
+      const delivered = await fulfillDelivery({
         cards: removed,
         userEmail,
         userId,
@@ -115,7 +111,7 @@ export async function POST(request: NextRequest) {
         paid: true,
         cards: delivered,
         total,
-        newBalance: profile.balance,
+        newBalance: balance - total,
       })
     }
 

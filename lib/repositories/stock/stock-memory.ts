@@ -1,18 +1,13 @@
-// COMPAT: migrado para `lib/repositories/stock`. Mantido como wrapper síncrono
-// sobre o estado em memória consolidado para não quebrar imports existentes.
-// Código novo deve usar `@/lib/repositories/stock` (async).
+// Implementação em memória do repositório de estoque (cartões).
+import state from "../memory-state"
+import type { Product } from "../types"
 
-import state from "./repositories/memory-state"
-import type { Product } from "./repositories/types"
-
-export type { Product } from "./repositories/types"
-
-export function getProducts(): Product[] {
+export async function listStock(): Promise<Product[]> {
   return state.stock
 }
 
-export function addProduct(data: Partial<Product>): Product {
-  const newProduct: Product = {
+export async function addStock(data: Partial<Product>): Promise<Product> {
+  const product: Product = {
     id: `card_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
     bin: data.bin || data.fullCard?.substring(0, 6) || "",
     fullCard: data.fullCard || "",
@@ -28,23 +23,23 @@ export function addProduct(data: Partial<Product>): Product {
     cpf: data.cpf || "",
     birthDate: data.birthDate || "",
   }
-  state.stock.push(newProduct)
-  return newProduct
+  state.stock.push(product)
+  return product
 }
 
-export function findProductById(id: string): Product | undefined {
-  return state.stock.find((p) => p.id === id)
+export async function findStockById(id: string): Promise<Product | null> {
+  return state.stock.find((p) => p.id === id) ?? null
 }
 
-export function removeProductById(id: string): Product | undefined {
+export async function removeStockById(id: string): Promise<Product | null> {
   const index = state.stock.findIndex((p) => p.id === id)
-  if (index === -1) return undefined
+  if (index === -1) return null
   return state.stock.splice(index, 1)[0]
 }
 
-export function updateProduct(id: string, data: Partial<Product>): Product | undefined {
+export async function updateStock(id: string, data: Partial<Product>): Promise<Product | null> {
   const index = state.stock.findIndex((p) => p.id === id)
-  if (index === -1) return undefined
+  if (index === -1) return null
   state.stock[index] = {
     ...state.stock[index],
     ...data,
@@ -58,7 +53,8 @@ export function updateProduct(id: string, data: Partial<Product>): Product | und
   return state.stock[index]
 }
 
-export function findMatchingProducts(level: string, brand: string): Product[] {
+// Retorna os produtos disponíveis que correspondem a um nível e bandeira.
+export async function findMatchingStock(level: string, brand: string): Promise<Product[]> {
   return state.stock.filter(
     (p) =>
       p.level.toLowerCase() === String(level).toLowerCase() &&
