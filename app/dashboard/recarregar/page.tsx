@@ -38,20 +38,22 @@ export default function RecarregarPage() {
   const [currentBalance, setCurrentBalance] = useState(0)
   const [creditedAmount, setCreditedAmount] = useState(0)
 
-  // Load current balance
-  useEffect(() => {
-    const loadBalance = async () => {
-      try {
-        const res = await fetch("/api/users")
+  // Load current balance (usuário autenticado)
+  const loadBalance = useCallback(async () => {
+    try {
+      const res = await fetch("/api/user/balance")
+      if (res.ok) {
         const data = await res.json()
-        const user = data.users?.find((u: { email: string; balance: number }) => u.email === "teste@teste.com")
-        if (user) setCurrentBalance(user.balance)
-      } catch {
-        // ignore
+        setCurrentBalance(Number(data.balance ?? 0))
       }
+    } catch {
+      // ignore
     }
-    loadBalance()
   }, [])
+
+  useEffect(() => {
+    loadBalance()
+  }, [loadBalance])
 
   const handleCustomValueChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let value = e.target.value.replace(/\D/g, "")
@@ -76,20 +78,24 @@ export default function RecarregarPage() {
     setError(null)
   }
 
-  // Credit balance after payment confirmed
+  // Credit balance after payment confirmed (usuário autenticado)
   const creditBalance = useCallback(async (amount: number) => {
     try {
-      await fetch("/api/users", {
+      const res = await fetch("/api/user/balance", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          action: "update_balance",
-          email: "teste@teste.com",
+          operation: "credit",
           amount: amount,
         }),
       })
+      const data = await res.json()
       setCreditedAmount(amount)
-      setCurrentBalance((prev) => prev + amount)
+      if (res.ok && data.balance !== undefined) {
+        setCurrentBalance(Number(data.balance))
+      } else {
+        setCurrentBalance((prev) => prev + amount)
+      }
     } catch (err) {
       console.error("Error crediting balance:", err)
     }

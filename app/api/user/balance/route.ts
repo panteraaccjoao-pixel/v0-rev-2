@@ -54,10 +54,44 @@ export async function GET() {
   }
 }
 
-// POST - atualiza o saldo (operações: add, deduct, set)
+// POST - atualiza o saldo (operações: add, deduct, set por email; ou credit no usuário autenticado)
 export async function POST(request: NextRequest) {
   try {
-    const { email, amount, operation } = await request.json()
+    const body = await request.json()
+    const { email, amount, operation } = body
+
+    // Crédito no usuário autenticado (usado pela recarga PIX)
+    if (operation === "credit") {
+      const supabase = await createClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (!user) {
+        return NextResponse.json({ error: "Não autenticado" }, { status: 401 })
+      }
+
+      const creditAmount = Number(amount)
+      if (!creditAmount || creditAmount <= 0) {
+        return NextResponse.json({ error: "Valor inválido" }, { status: 400 })
+      }
+
+      const admin = createAdminClient()
+      const { data: profile } = await admin
+        .from("profiles")
+        .select("id, balance")
+        .eq("id", user.id)
+        .maybeSingle()
+
+      if (!profile) {
+        return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 })
+      }
+
+      const newBalance = Number(profile.balance ?? 0) + creditAmount
+      await admin.from("profiles").update({ balance: newBalance }).eq("id", user.id)
+
+      return NextResponse.json({ success: true, balance: newBalance })
+    }
 
     if (!email || amount === undefined) {
       return NextResponse.json({ error: "Email e valor são obrigatórios" }, { status: 400 })
