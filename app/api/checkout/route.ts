@@ -129,7 +129,7 @@ export async function POST(request: NextRequest) {
     // Reserva os cartões removendo-os do estoque (evita venda dupla).
     const reservedCards: Product[] = []
     for (const card of selectedCards) {
-      const r = removeProductById(card.id)
+      const r = await removeStockById(card.id)
       if (r) reservedCards.push(r)
     }
 
@@ -156,7 +156,7 @@ export async function POST(request: NextRequest) {
       })),
     }
 
-    addPixPayment(payment)
+    await addPixPayment(payment)
 
     return NextResponse.json({
       success: true,

@@ -5,34 +5,32 @@ import { createPix } from "@/lib/pix-gateway"
 import { addBalance } from "@/app/api/user/balance/route"
 import { isAuthenticatedAdmin, isInternalRequest, unauthorizedResponse } from "@/lib/admin-auth"
 import {
-  type PixPayment,
-  getPixPayments,
   addPixPayment,
   findPixPayment,
-} from "@/lib/pix-store"
+  updatePixPayment,
+} from "@/lib/repositories/pix"
+import type { PixPayment } from "@/lib/repositories/types"
 import { fulfillDelivery, type DeliveredCard } from "@/lib/fulfillment"
-
-// Compat: re-exporta a lista de pagamentos para quem ainda importa daqui.
-export const pixPayments = getPixPayments()
 
 // Confirma um pagamento: credita saldo (recarga) ou entrega cartões (compra).
 // Idempotente e seguro para ser chamado por PATCH e pelo webhook da gateway.
 export async function confirmPayment(payment: PixPayment): Promise<DeliveredCard[]> {
-  payment.status = "paid"
-
   if (payment.purpose === "recharge") {
     if (!payment.credited && payment.userEmail) {
       await addBalance(payment.userEmail, payment.amount)
-      payment.credited = true
+      await updatePixPayment(payment.id, { status: "paid", credited: true })
+    } else {
+      await updatePixPayment(payment.id, { status: "paid" })
     }
     return []
   }
 
+  await updatePixPayment(payment.id, { status: "paid" })
   return deliverPurchase(payment)
 }
 
 // Entrega os cartões de uma compra paga (idempotente).
-function deliverPurchase(payment: PixPayment): DeliveredCard[] {
+async function deliverPurchase(payment: PixPayment): Promise<DeliveredCard[]> {
   if (payment.purpose !== "purchase") return []
   if (payment.delivered) {
     // Já entregue: reconstrói a view a partir dos cartões reservados.
@@ -52,13 +50,13 @@ function deliverPurchase(payment: PixPayment): DeliveredCard[] {
     }))
   }
 
-  const delivered = fulfillDelivery({
+  const delivered = await fulfillDelivery({
     cards: payment.reservedCards,
     userEmail: payment.userEmail,
     userId: payment.userId,
     userName: payment.userName,
   })
-  payment.delivered = true
+  await updatePixPayment(payment.id, { delivered: true })
   return delivered
 }
 
@@ -101,7 +99,7 @@ export async function POST(request: NextRequest) {
       items: items || [],
     }
 
-    addPixPayment(payment)
+    await addPixPayment(payment)
 
     return NextResponse.json({
       success: true,
@@ -130,15 +128,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "ID do pagamento obrigatorio" }, { status: 400 })
     }
 
-    const payment = findPixPayment(id)
+    const payment = await findPixPayment(id)
 
     if (!payment) {
       return NextResponse.json({ error: "Pagamento nao encontrado" }, { status: 404 })
     }
 
-    // Marca como expirado se passou do prazo (estoque reservado volta a ficar livre? 
-    // mantemos reservado para simplicidade; reposição manual via admin).
+    // Marca como expirado se passou do prazo.
     if (payment.status === "pending" && new Date() > payment.expiresAt) {
+      await updatePixPayment(payment.id, { status: "expired" })
       payment.status = "expired"
     }
 
@@ -159,7 +157,7 @@ export async function GET(request: NextRequest) {
 
     // Se a compra já foi paga, garante a entrega e devolve os cartões.
     if (payment.status === "paid" && payment.purpose === "purchase") {
-      response.cards = deliverPurchase(payment)
+      response.cards = await deliverPurchase(payment)
     }
 
     return NextResponse.json(response)
@@ -184,7 +182,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "ID do pagamento obrigatorio" }, { status: 400 })
     }
 
-    const payment = findPixPayment(id)
+    const payment = await findPixPayment(id)
 
     if (!payment) {
       return NextResponse.json({ error: "Pagamento nao encontrado" }, { status: 404 })
@@ -199,7 +197,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     if (action === "cancel") {
-      payment.status = "expired"
+      await updatePixPayment(payment.id, { status: "expired" })
       return NextResponse.json({ success: true, status: "expired" })
     }
 

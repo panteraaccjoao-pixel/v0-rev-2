@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { findPixPayment } from "@/lib/pix-store"
+import { findPixPayment } from "@/lib/repositories/pix"
 import { confirmPayment } from "@/app/api/pix/route"
 
 // This webhook receives payment notifications from your gateway
@@ -100,7 +100,7 @@ export async function POST(request: Request) {
       // Confirma o pagamento no nosso store: credita saldo (recarga)
       // ou entrega os cartões e baixa o estoque (compra).
       const paymentId = paymentData.externalId || paymentData.id
-      const payment = paymentId ? findPixPayment(String(paymentId)) : undefined
+      const payment = paymentId ? await findPixPayment(String(paymentId)) : null
 
       if (payment && payment.status !== "paid") {
         try {

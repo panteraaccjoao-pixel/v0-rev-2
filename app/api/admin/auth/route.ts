@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
-import store, { verifyPassword, createAdminToken, revokeAdminToken } from "@/lib/data-store"
+import { verifyPassword } from "@/lib/repositories/crypto"
+import { createAdminToken, revokeAdminToken } from "@/lib/repositories/admin-session"
+import { findAdminByEmail } from "@/lib/repositories/settings"
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,7 +15,7 @@ export async function POST(request: NextRequest) {
     }
 
     const normalizedEmail = String(email).toLowerCase()
-    const admin = store.admins.find((a) => a.email.toLowerCase() === normalizedEmail)
+    const admin = await findAdminByEmail(normalizedEmail)
     const isValid = !!admin && verifyPassword(password, admin.password)
 
     if (isValid) {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import store, { verifyPassword, hashPassword } from "@/lib/data-store"
+import { changeAdminPassword } from "@/lib/repositories/settings"
 import { isAuthenticatedAdmin } from "@/lib/admin-auth"
 
 export async function POST(request: NextRequest) {
@@ -29,10 +29,9 @@ export async function POST(request: NextRequest) {
     }
 
     const normalizedEmail = String(email).toLowerCase()
-    const admin = store.admins.find((a) => a.email.toLowerCase() === normalizedEmail)
+    const changed = await changeAdminPassword(normalizedEmail, currentPassword, newPassword)
 
-    if (admin && verifyPassword(currentPassword, admin.password)) {
-      admin.password = hashPassword(newPassword)
+    if (changed) {
       return NextResponse.json({
         success: true,
         message: "Senha alterada com sucesso",

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import store from "@/lib/data-store"
+import { getSettings, saveSettings } from "@/lib/repositories/settings"
 import { isAuthenticatedAdmin, unauthorizedResponse } from "@/lib/admin-auth"
 
 const DEFAULT_SETTINGS = {
@@ -13,7 +13,7 @@ const DEFAULT_SETTINGS = {
 // GET - busca as configurações
 export async function GET() {
   try {
-    const settings = { ...DEFAULT_SETTINGS, ...(store.settings || {}) }
+    const settings = { ...DEFAULT_SETTINGS, ...((await getSettings()) || {}) }
     return NextResponse.json(settings)
   } catch (error) {
     console.error("Error fetching settings:", error)
@@ -29,8 +29,8 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
 
-    const merged = { ...DEFAULT_SETTINGS, ...(store.settings || {}), ...body }
-    store.settings = merged
+    const merged = { ...DEFAULT_SETTINGS, ...((await getSettings()) || {}), ...body }
+    await saveSettings(merged)
 
     return NextResponse.json({ success: true, settings: merged })
   } catch (error) {

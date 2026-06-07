@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { isValidAdminToken, getInternalSecret } from "@/lib/data-store"
+import { isValidAdminToken, getInternalSecret } from "@/lib/repositories/admin-session"
 
 // Verifica se a requisição vem de um admin autenticado.
 // Aceita o token via cookie admin_token OU header Authorization: Bearer.

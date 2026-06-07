@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getInternalSecret } from "@/lib/data-store"
+import { getInternalSecret } from "@/lib/repositories/admin-session"
 import { isAuthenticatedAdmin, unauthorizedResponse } from "@/lib/admin-auth"
 
 // In-memory storage for recharges (replace with database in production)

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { findProfileByEmail } from "@/lib/data-store"
+import { getUserByEmail, setBalance } from "@/lib/repositories/users"
 
 function getStore() {
   if (!global.giftsStore) {
@@ -42,7 +42,7 @@ export async function POST(request: Request) {
       )
     }
 
-    const profile = findProfileByEmail(email)
+    const profile = await getUserByEmail(email)
     if (!profile) {
       return NextResponse.json(
         { success: false, message: "Usuário não encontrado" },
@@ -51,7 +51,8 @@ export async function POST(request: Request) {
     }
 
     // Credita o saldo e marca o gift como resgatado
-    profile.balance += gift.value
+    const newBalance = Number(profile.balance ?? 0) + gift.value
+    await setBalance(profile.id, newBalance)
     gift.status = "resgatado"
     gift.usedBy = profile.email
     gift.usedAt = new Date().toISOString()
@@ -60,7 +61,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       value: gift.value,
-      balance: profile.balance,
+      balance: newBalance,
     })
   } catch (error) {
     console.error("Error redeeming gift:", error)

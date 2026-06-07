@@ -1,14 +1,6 @@
 import { NextResponse } from "next/server"
-import store from "@/lib/data-store"
+import { getConfig, saveConfig } from "@/lib/repositories/settings"
 import { isAuthenticatedAdmin, unauthorizedResponse } from "@/lib/admin-auth"
-
-async function getConfig(key: string) {
-  return store.config[key] || null
-}
-
-async function saveConfig(key: string, value: Record<string, any>) {
-  store.config[key] = { ...value, updated_at: new Date().toISOString() }
-}
 
 export async function POST(request: Request) {
   if (!isAuthenticatedAdmin(request)) {
