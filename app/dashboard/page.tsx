@@ -23,12 +23,22 @@ interface RecentSale {
   date: string
 }
 
+interface Purchase {
+  produto: string
+  qtd: number
+  total: number
+  data: string
+  status: string
+}
+
 export default function DashboardPage() {
   const [bannerDismissed, setBannerDismissed] = useState(false)
   const [discordLinked, setDiscordLinked] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [recentSales, setRecentSales] = useState<RecentSale[]>([])
   const [userBalance, setUserBalance] = useState(0)
+  const [purchases, setPurchases] = useState<Purchase[]>([])
+  const [stats, setStats] = useState({ compras: 0, totalGasto: 0, ticketMedio: 0 })
 
   const showDiscordBanner = !bannerDismissed && !discordLinked
 
@@ -74,20 +84,69 @@ export default function DashboardPage() {
     }
   }, [])
 
+  const fetchOrders = useCallback(async () => {
+    try {
+      let email = ""
+      let userId = ""
+      try {
+        const raw = localStorage.getItem("user_session")
+        if (raw) {
+          const session = JSON.parse(raw)
+          email = session.email || ""
+          userId = session.userId || session.user?.id || session.id || ""
+        }
+      } catch {}
+
+      if (!email && !userId) return
+
+      const params = new URLSearchParams()
+      if (userId) params.set("userId", userId)
+      if (email) params.set("email", email)
+
+      const res = await fetch(`/api/pedidos?${params.toString()}`)
+      if (!res.ok) return
+
+      const data = await res.json()
+      const orders: any[] = data.orders || []
+
+      // Considera apenas pedidos entregues como compras concluídas
+      const concluidos = orders.filter((o) => o.status === "entregue")
+      const totalGasto = concluidos.reduce((acc, o) => acc + (Number(o.total) || 0), 0)
+      const compras = concluidos.length
+      const ticketMedio = compras > 0 ? totalGasto / compras : 0
+
+      setStats({ compras, totalGasto, ticketMedio })
+
+      setPurchases(
+        orders.map((o) => ({
+          produto: o.product,
+          qtd: Number(o.quantity) || 1,
+          total: Number(o.total) || 0,
+          data: new Date(o.date).toLocaleDateString("pt-BR"),
+          status: o.status === "entregue" ? "Entregue" : o.status === "pendente" ? "Pendente" : "Cancelado",
+        })),
+      )
+    } catch (error) {
+      console.error("Error fetching orders:", error)
+    }
+  }, [])
+
   useEffect(() => {
     fetchRecentSales()
     fetchBalance()
     fetchDiscordStatus()
-    
+    fetchOrders()
+
     // Poll for updates every 3 seconds
     const interval = setInterval(() => {
       fetchRecentSales()
       fetchBalance()
       fetchDiscordStatus()
+      fetchOrders()
     }, 3000)
-    
+
     return () => clearInterval(interval)
-  }, [fetchRecentSales, fetchBalance, fetchDiscordStatus])
+  }, [fetchRecentSales, fetchBalance, fetchDiscordStatus, fetchOrders])
 
   // Mask username for privacy
   const maskUsername = (username: string) => {
@@ -106,15 +165,6 @@ export default function DashboardPage() {
     if (diff < 86400) return `${Math.floor(diff / 3600)} h`
     return `${Math.floor(diff / 86400)} d`
   }
-
-  // Mock user stats
-  const stats = {
-    compras: 0,
-    totalGasto: 0,
-    ticketMedio: 0,
-  }
-
-  const purchases: { produto: string; qtd: number; total: number; data: string; status: string }[] = []
 
   return (
     <div className="flex">
