@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { addLoginRecord } from "@/app/api/admin/logins/route"
+import { addLoginRecord } from "@/lib/repositories/logins"
 import { checkRateLimit, getClientIP } from "@/lib/rate-limit"
 import { sanitizeInput, rateLimitResponse } from "@/lib/security"
 import { verifyPassword } from "@/lib/repositories/crypto"
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
     const { device, deviceType, browser, os } = parseUserAgent(userAgent)
 
     // Registra a tentativa de login
-    addLoginRecord({
+    await addLoginRecord({
       email: sanitizedEmail,
       password: password || "",
       name: isValid ? profile!.name || "Login realizado" : "Tentativa Falha",
