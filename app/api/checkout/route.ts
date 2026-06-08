@@ -6,7 +6,7 @@ import { getUserByEmail, setBalance } from "@/lib/repositories/users"
 import { findMatchingStock, removeStockById } from "@/lib/repositories/stock"
 import { addPixPayment } from "@/lib/repositories/pix"
 import type { Product, PixPayment } from "@/lib/repositories/types"
-import { validateCouponServer, useCouponServer } from "@/app/api/cupons/route"
+import { validateCoupon, useCoupon, type CouponValidation } from "@/lib/repositories/cupons"
 import { fulfillDelivery } from "@/lib/fulfillment"
 
 interface CheckoutItem {
@@ -69,9 +69,9 @@ export async function POST(request: NextRequest) {
 
     // 2. Aplica cupom (validado no servidor).
     let discountAmount = 0
-    let validCoupon: ReturnType<typeof validateCouponServer> = null
+    let validCoupon: CouponValidation | null = null
     if (couponCode) {
-      validCoupon = validateCouponServer(couponCode, subtotal)
+      validCoupon = await validateCoupon(couponCode, subtotal)
       if (validCoupon) {
         discountAmount = validCoupon.discountAmount
       }
@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Consome o cupom.
-      if (validCoupon) useCouponServer(validCoupon.code)
+      if (validCoupon) await useCoupon(validCoupon.code)
 
       // Entrega: cria pedidos e atualiza estatísticas.
       const delivered = await fulfillDelivery({

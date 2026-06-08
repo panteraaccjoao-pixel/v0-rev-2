@@ -86,6 +86,18 @@ export interface AdminAccount {
   password: string
 }
 
+export interface Cupom {
+  id: string
+  code: string
+  discount: number
+  type: "percent" | "fixed"
+  uses: number
+  maxUses: number | null
+  status: "ativo" | "expirado" | "desativado"
+  expiry: string | null
+  createdAt: string
+}
+
 // ---- Tipos de entrada de repositórios ----
 
 export interface CreateUserInput {

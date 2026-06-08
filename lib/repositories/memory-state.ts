@@ -10,6 +10,7 @@ import type {
   Order,
   PixPayment,
   AdminAccount,
+  Cupom,
 } from "./types"
 
 interface MemoryState {
@@ -17,6 +18,7 @@ interface MemoryState {
   orders: Order[]
   stock: Product[]
   pixPayments: PixPayment[]
+  cupons: Cupom[]
   config: Record<string, Record<string, any>>
   settings: Record<string, any> | null
   admins: AdminAccount[]
@@ -33,6 +35,7 @@ const state: MemoryState =
     orders: [],
     stock: [],
     pixPayments: [],
+    cupons: [],
     config: {},
     settings: null,
     admins: [{ email: "admin@teste.com", password: hashPassword("admin123") }],
@@ -43,6 +46,7 @@ const state: MemoryState =
 // Garante campos novos mesmo num state criado por hot-reload antigo.
 if (!state.adminTokens) state.adminTokens = new Map<string, number>()
 if (!state.internalSecret) state.internalSecret = randomBytes(32).toString("hex")
+if (!state.cupons) state.cupons = []
 
 // Seed: admin de teste.
 if (!state.admins.some((a) => a.email === "admin@teste.com")) {

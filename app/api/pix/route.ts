@@ -113,6 +113,7 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error("Error creating PIX payment:", error)
+    console.log("[v0] PIX create error detail:", error instanceof Error ? error.message : String(error))
     return NextResponse.json({ error: "Erro ao criar pagamento" }, { status: 500 })
   }
 }

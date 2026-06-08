@@ -57,8 +57,16 @@ function isMaskedKey(value?: string) {
 // Obtém a configuração da gateway.
 // Prioridade: 1) painel admin  2) variáveis de ambiente (VeloraPay) como fallback.
 export async function getGatewayConfig() {
-  // 1. Painel admin tem prioridade (configurável pela interface sem mexer no deploy)
-  const adminConfig = await getGatewayConfigRaw()
+  // 1. Painel admin tem prioridade (configurável pela interface sem mexer no deploy).
+  // Se a leitura falhar (banco indisponível, tabela ausente etc.), não derruba a
+  // geração de PIX: apenas seguimos para o fallback das variáveis de ambiente.
+  let adminConfig: Record<string, any> | null = null
+  try {
+    adminConfig = await getGatewayConfigRaw()
+  } catch (err) {
+    console.error("[v0] Falha ao ler config do gateway (usando fallback de env):", err)
+    adminConfig = null
+  }
   if (
     adminConfig?.gateway &&
     adminConfig?.apiKey &&
