@@ -5,6 +5,7 @@ import { sanitizeInput, rateLimitResponse } from "@/lib/security"
 import { verifyPassword } from "@/lib/repositories/crypto"
 import { getUserByEmail } from "@/lib/repositories/users"
 import { createUserToken, USER_SESSION_COOKIE, sessionCookieOptions } from "@/lib/user-session"
+import { verifyRecaptcha } from "@/lib/recaptcha"
 
 // Helper to parse user agent
 function parseUserAgent(ua: string): { device: string; deviceType: "desktop" | "mobile"; browser: string; os: string } {
@@ -42,7 +43,16 @@ export async function POST(request: NextRequest) {
       return rateLimitResponse(rateLimit.resetIn)
     }
 
-    const { email, password, discordId } = await request.json()
+    const { email, password, discordId, captchaToken } = await request.json()
+
+    // Valida o captcha no servidor (a secret nunca sai daqui).
+    const captchaOk = await verifyRecaptcha(captchaToken)
+    if (!captchaOk) {
+      return NextResponse.json(
+        { success: false, message: "Falha na verificação do captcha. Tente novamente." },
+        { status: 400 }
+      )
+    }
 
     if (!email) {
       return NextResponse.json({ success: false, message: "Email obrigatorio" }, { status: 400 })

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { saveSession } from "@/lib/session"
+import { Recaptcha } from "@/components/recaptcha"
 
 export default function RegisterPage() {
   const [name, setName] = useState("")
@@ -17,12 +18,14 @@ export default function RegisterPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null)
 
   const isFormValid =
     name.trim() !== "" &&
     email.trim() !== "" &&
     password.length >= 6 &&
-    password === confirmPassword
+    password === confirmPassword &&
+    captchaToken !== null
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -40,6 +43,10 @@ export default function RegisterPage() {
       setError("As senhas não coincidem")
       return
     }
+    if (!captchaToken) {
+      setError("Confirme que você não é um robô.")
+      return
+    }
 
     setLoading(true)
 
@@ -51,6 +58,7 @@ export default function RegisterPage() {
           name: name.trim(),
           email: email.trim().toLowerCase(),
           password,
+          captchaToken,
         }),
       })
 
@@ -188,6 +196,9 @@ export default function RegisterPage() {
                 <p className="text-xs text-red-500">As senhas não coincidem</p>
               )}
             </div>
+
+            {/* reCAPTCHA */}
+            <Recaptcha onChange={setCaptchaToken} />
 
             {/* Submit button */}
             <Button type="submit" className="h-12 w-full" disabled={!isFormValid || loading}>
