@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Star, ThumbsUp, MessageCircle, CreditCard } from "lucide-react"
+import { useState, useEffect, useRef } from "react"
+import { Star, ThumbsUp, MessageCircle, CreditCard, ImagePlus, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import {
@@ -54,6 +54,10 @@ export default function AvaliacoesPage() {
   const [sort, setSort] = useState("recent")
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [uploadError, setUploadError] = useState<string | null>(null)
   
   // New review form state
   const [newReview, setNewReview] = useState({
@@ -80,14 +84,65 @@ export default function AvaliacoesPage() {
     fetchReviews()
   }, [filter, sort])
 
+  const handleSelectImage = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setUploadError(null)
+
+    const allowed = ["image/jpeg", "image/png", "image/webp", "image/gif"]
+    if (!allowed.includes(file.type)) {
+      setUploadError("Formato inválido. Use JPG, PNG, WEBP ou GIF.")
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setUploadError("Imagem muito grande. Máximo de 5MB.")
+      return
+    }
+
+    setImageFile(file)
+    setImagePreview(URL.createObjectURL(file))
+  }
+
+  const handleRemoveImage = () => {
+    setImageFile(null)
+    setImagePreview(null)
+    setUploadError(null)
+    if (fileInputRef.current) fileInputRef.current.value = ""
+  }
+
+  const resetForm = () => {
+    setNewReview({ rating: 5, comment: "", productType: "Standard", price: "" })
+    handleRemoveImage()
+  }
+
   const handleSubmitReview = async () => {
     if (!newReview.comment.trim()) return
 
     setSubmitting(true)
+    setUploadError(null)
     try {
       const session = localStorage.getItem("user_session")
       const userData = session ? JSON.parse(session) : {}
       const username = userData.user?.name || userData.name || "Usuário"
+
+      // Faz o upload da imagem primeiro (se houver)
+      let imageUrl: string | null = null
+      if (imageFile) {
+        const fd = new FormData()
+        fd.append("file", imageFile)
+        const uploadRes = await fetch("/api/reviews/upload", {
+          method: "POST",
+          body: fd,
+        })
+        const uploadData = await uploadRes.json()
+        if (!uploadRes.ok) {
+          setUploadError(uploadData.error || "Falha ao enviar a imagem.")
+          setSubmitting(false)
+          return
+        }
+        imageUrl = uploadData.url
+      }
 
       const res = await fetch("/api/reviews", {
         method: "POST",
@@ -98,12 +153,13 @@ export default function AvaliacoesPage() {
           comment: newReview.comment,
           productType: newReview.productType,
           price: parseFloat(newReview.price) || 0,
+          imageUrl,
         }),
       })
 
       if (res.ok) {
         setIsModalOpen(false)
-        setNewReview({ rating: 5, comment: "", productType: "Standard", price: "" })
+        resetForm()
         fetchReviews()
       }
     } catch (error) {
@@ -195,7 +251,7 @@ export default function AvaliacoesPage() {
   return (
     <div className="space-y-6">
       {/* Header with Leave Review Button */}
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+      <Dialog open={isModalOpen} onOpenChange={(open) => { setIsModalOpen(open); if (!open) resetForm() }}>
         <DialogTrigger asChild>
           <Button className="bg-amber-500 text-black hover:bg-amber-400 font-medium">
             <Star className="mr-2 h-4 w-4" />
@@ -257,6 +313,47 @@ export default function AvaliacoesPage() {
                 onChange={(e) => setNewReview({ ...newReview, comment: e.target.value })}
                 rows={4}
               />
+            </div>
+
+            {/* Photo upload */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Foto (opcional)</label>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                onChange={handleSelectImage}
+                className="hidden"
+              />
+              {imagePreview ? (
+                <div className="relative w-fit">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={imagePreview || "/placeholder.svg"}
+                    alt="Pré-visualização da foto da avaliação"
+                    className="h-32 w-40 rounded-lg border border-border object-cover"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleRemoveImage}
+                    className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-destructive text-destructive-foreground shadow-md transition-transform hover:scale-110"
+                    aria-label="Remover foto"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex h-24 w-full flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border bg-secondary/40 text-sm text-muted-foreground transition-colors hover:border-amber-500 hover:text-foreground"
+                >
+                  <ImagePlus className="h-5 w-5" />
+                  <span>Adicionar foto</span>
+                  <span className="text-xs text-muted-foreground/70">JPG, PNG, WEBP ou GIF (máx. 5MB)</span>
+                </button>
+              )}
+              {uploadError && <p className="text-sm text-destructive">{uploadError}</p>}
             </div>
 
             {/* Submit Button */}
@@ -403,7 +500,13 @@ export default function AvaliacoesPage() {
               {/* Image if exists */}
               {review.imageUrl && (
                 <div className="mt-3">
-                  <div className="h-24 w-32 rounded bg-secondary" />
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={review.imageUrl || "/placeholder.svg"}
+                    alt={`Foto da avaliação de ${review.username}`}
+                    className="max-h-64 w-auto rounded-lg border border-border object-cover"
+                    loading="lazy"
+                  />
                 </div>
               )}
 
