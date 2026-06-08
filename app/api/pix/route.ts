@@ -4,6 +4,7 @@ import { rateLimitResponse } from "@/lib/security"
 import { createPix } from "@/lib/pix-gateway"
 import { addBalance } from "@/app/api/user/balance/route"
 import { isAuthenticatedAdmin, isInternalRequest, unauthorizedResponse } from "@/lib/admin-auth"
+import { requireUser } from "@/lib/user-auth"
 import {
   addPixPayment,
   findPixPayment,
@@ -70,8 +71,16 @@ export async function POST(request: NextRequest) {
       return rateLimitResponse(rateLimit.resetIn)
     }
 
+    // Exige usuário autenticado. A recarga é creditada no PRÓPRIO usuário.
+    const session = requireUser(request)
+    if (!session) {
+      return unauthorizedResponse()
+    }
+    const userEmail = session.email.toLowerCase()
+    const userId = session.uid
+
     const data = await request.json()
-    const { amount, items, userId, userEmail } = data
+    const { amount, items } = data
 
     if (!amount || amount <= 0) {
       return NextResponse.json({ error: "Valor invalido" }, { status: 400 })

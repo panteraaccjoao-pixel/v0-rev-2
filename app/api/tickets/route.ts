@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
+import { requireUser, unauthorizedResponse } from "@/lib/user-auth"
+import { isAuthenticatedAdmin } from "@/lib/admin-auth"
 
 // In-memory storage for tickets (replace with database in production)
 let tickets: Ticket[] = []
@@ -28,10 +30,10 @@ interface Ticket {
 // GET - List tickets for a user or all tickets for admin
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
-  const userId = searchParams.get("userId")
-  const isAdmin = searchParams.get("admin") === "true"
+  const wantsAdmin = searchParams.get("admin") === "true"
 
-  if (isAdmin) {
+  if (wantsAdmin) {
+    if (!isAuthenticatedAdmin(request)) return unauthorizedResponse()
     // Return all tickets for admin
     return NextResponse.json({
       tickets: tickets.sort((a, b) => 
@@ -40,13 +42,12 @@ export async function GET(request: NextRequest) {
     })
   }
 
-  if (!userId) {
-    return NextResponse.json({ error: "userId required" }, { status: 400 })
-  }
+  const session = requireUser(request)
+  if (!session) return unauthorizedResponse()
 
-  // Return tickets for specific user
+  // Sempre escopado ao usuário da sessão.
   const userTickets = tickets
-    .filter(t => t.userId === userId)
+    .filter(t => t.userId === session.uid)
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
 
   return NextResponse.json({ tickets: userTickets })
@@ -55,13 +56,19 @@ export async function GET(request: NextRequest) {
 // POST - Create new ticket or add message
 export async function POST(request: NextRequest) {
   try {
+    const session = requireUser(request)
+    if (!session) return unauthorizedResponse()
+
     const body = await request.json()
     const { action } = body
 
     if (action === "create") {
-      const { userId, username, subject, category, message, priority } = body
+      const { subject, category, message, priority } = body
+      // Identidade vem da sessão — nunca do corpo.
+      const userId = session.uid
+      const username = session.name || session.email
 
-      if (!userId || !username || !subject || !message) {
+      if (!subject || !message) {
         return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
       }
 
@@ -92,9 +99,10 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === "reply") {
-      const { ticketId, senderId, senderName, senderType, content } = body
+      const { ticketId, content } = body
+      const isAdmin = isAuthenticatedAdmin(request)
 
-      if (!ticketId || !senderId || !senderName || !content) {
+      if (!ticketId || !content) {
         return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
       }
 
@@ -103,11 +111,17 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Ticket not found" }, { status: 404 })
       }
 
+      // Usuário comum só responde os próprios tickets.
+      if (!isAdmin && tickets[ticketIndex].userId !== session.uid) {
+        return unauthorizedResponse()
+      }
+
+      const senderType: "user" | "admin" = isAdmin ? "admin" : "user"
       const newMessage: Message = {
         id: `MSG-${Date.now()}`,
-        senderId,
-        senderName,
-        senderType: senderType || "user",
+        senderId: isAdmin ? "admin" : session.uid,
+        senderName: isAdmin ? "Suporte" : session.name || session.email,
+        senderType,
         content,
         createdAt: new Date().toISOString(),
       }
@@ -127,10 +141,16 @@ export async function POST(request: NextRequest) {
 
     if (action === "close") {
       const { ticketId } = body
+      const isAdmin = isAuthenticatedAdmin(request)
       const ticketIndex = tickets.findIndex(t => t.id === ticketId)
       
       if (ticketIndex === -1) {
         return NextResponse.json({ error: "Ticket not found" }, { status: 404 })
+      }
+
+      // Usuário comum só fecha os próprios tickets.
+      if (!isAdmin && tickets[ticketIndex].userId !== session.uid) {
+        return unauthorizedResponse()
       }
 
       tickets[ticketIndex].status = "closed"
@@ -148,6 +168,7 @@ export async function POST(request: NextRequest) {
 
 // DELETE - Delete a ticket (admin only)
 export async function DELETE(request: NextRequest) {
+  if (!isAuthenticatedAdmin(request)) return unauthorizedResponse()
   const { searchParams } = new URL(request.url)
   const ticketId = searchParams.get("id")
 

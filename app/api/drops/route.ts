@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { cookies } from "next/headers"
+import { isAuthenticatedAdmin, unauthorizedResponse } from "@/lib/admin-auth"
 
 // In-memory store for drops (in production, use a database)
 // This is shared across all requests
@@ -50,6 +51,7 @@ export async function GET() {
 
 // Admin endpoint to create a new drop
 export async function POST(request: Request) {
+  if (!isAuthenticatedAdmin(request)) return unauthorizedResponse()
   try {
     const body = await request.json()
     const { produto, nivel, bandeira, preco, quantidade } = body
@@ -85,6 +87,7 @@ export async function POST(request: Request) {
 
 // Delete a drop
 export async function DELETE(request: Request) {
+  if (!isAuthenticatedAdmin(request)) return unauthorizedResponse()
   try {
     const { searchParams } = new URL(request.url)
     const dropId = searchParams.get("id")

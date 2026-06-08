@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { isAuthenticatedAdmin, isInternalRequest, unauthorizedResponse } from "@/lib/admin-auth"
 
 interface Compra {
   id: string
@@ -16,7 +17,8 @@ interface Compra {
 // In-memory storage for compras
 const compras: Compra[] = []
 
-export async function GET() {
+export async function GET(request: Request) {
+  if (!isAuthenticatedAdmin(request)) return unauthorizedResponse()
   const entregues = compras.filter(c => c.status === "entregue")
   const pendentes = compras.filter(c => c.status === "pendente")
   const cancelados = compras.filter(c => c.status === "cancelado")

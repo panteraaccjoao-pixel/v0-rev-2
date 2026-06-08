@@ -5,6 +5,7 @@ import {
   addBalance as addBalanceById,
 } from "@/lib/repositories/users"
 import { isAuthenticatedAdmin, isInternalRequest, unauthorizedResponse } from "@/lib/admin-auth"
+import { requireUser } from "@/lib/user-auth"
 
 // Helpers de saldo (por email) — reimplementados sobre o repositório de usuários.
 export async function getUserBalance(email: string): Promise<number> {
@@ -30,20 +31,21 @@ export async function addBalance(email: string, amount: number): Promise<void> {
   if (profile) await addBalanceById(profile.id, amount)
 }
 
-// GET - retorna o saldo do usuário (email via query param)
+// GET - retorna o saldo do PRÓPRIO usuário autenticado.
+// A identidade vem da sessão (não de query param), então ninguém consegue
+// ler o saldo de outra conta trocando o e-mail na URL.
 export async function GET(request: NextRequest) {
   try {
-    const email = request.nextUrl.searchParams.get("email")?.toLowerCase()
-
-    if (!email) {
-      return NextResponse.json({ balance: 0, timestamp: new Date().toISOString() })
+    const session = requireUser(request)
+    if (!session) {
+      return unauthorizedResponse()
     }
 
-    const profile = await getUserByEmail(email)
+    const profile = await getUserByEmail(session.email.toLowerCase())
 
     return NextResponse.json({
       balance: Number(profile?.balance ?? 0),
-      email,
+      email: session.email,
       timestamp: new Date().toISOString(),
     })
   } catch {

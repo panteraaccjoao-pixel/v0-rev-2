@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createOrder, listOrders, updateOrderStatus } from "@/lib/repositories/orders"
 import type { Order } from "@/lib/repositories/types"
+import { requireUser, unauthorizedResponse } from "@/lib/user-auth"
+import { isAuthenticatedAdmin, isInternalRequest } from "@/lib/admin-auth"
 
 export type { Order } from "@/lib/repositories/types"
 
@@ -18,14 +20,27 @@ export async function createOrderRecord(data: {
   return createOrder(data)
 }
 
-// GET - lista pedidos (filtra por userId ou email)
+// GET - lista os pedidos do PRÓPRIO usuário autenticado.
+// Admin autenticado pode listar de qualquer usuário (via query).
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url)
-    const userId = searchParams.get("userId")
-    const userEmail = searchParams.get("email")
+    const isAdmin = isAuthenticatedAdmin(request)
 
-    const filteredOrders = await listOrders({ userId, email: userEmail })
+    if (isAdmin) {
+      const { searchParams } = new URL(request.url)
+      const userId = searchParams.get("userId")
+      const userEmail = searchParams.get("email")
+      const filteredOrders = await listOrders({ userId, email: userEmail })
+      return NextResponse.json({ orders: filteredOrders, total: filteredOrders.length })
+    }
+
+    const session = requireUser(request)
+    if (!session) {
+      return unauthorizedResponse()
+    }
+
+    // Sempre escopado ao usuário da sessão — ignora qualquer email/userId da query.
+    const filteredOrders = await listOrders({ userId: session.uid, email: session.email })
 
     return NextResponse.json({
       orders: filteredOrders,
@@ -37,8 +52,13 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST - cria um novo pedido (chamado após uma compra)
+// POST - cria um novo pedido. Apenas chamadas internas (server-to-server, ex:
+// fulfillment) ou admin. O frontend NÃO cria pedidos diretamente — isso passa
+// pelo /api/checkout, que valida saldo e estoque.
 export async function POST(request: NextRequest) {
+  if (!isInternalRequest(request) && !isAuthenticatedAdmin(request)) {
+    return unauthorizedResponse()
+  }
   try {
     const body = await request.json()
     const { userId, userName, product, level, brand, total, cardData } = body
@@ -64,8 +84,11 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// PATCH - atualiza o status de um pedido
+// PATCH - atualiza o status de um pedido. Restrito a admin/interno.
 export async function PATCH(request: NextRequest) {
+  if (!isInternalRequest(request) && !isAuthenticatedAdmin(request)) {
+    return unauthorizedResponse()
+  }
   try {
     const body = await request.json()
     const { id, status } = body
