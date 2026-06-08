@@ -18,6 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { getSession } from "@/lib/session"
 
 interface ProductGroup {
   level: string
@@ -101,11 +102,17 @@ export default function ComprarCartoesPage() {
     try {
       // Get the first available card from this product group
       const cardId = selectedProduct.products[0].id
-      
+
+      // Envia o e-mail da sessão: o backend exige um usuário válido e cobra do saldo.
+      const session = getSession()
       const res = await fetch("/api/estoque", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: cardId, action: "purchase" })
+        body: JSON.stringify({
+          id: cardId,
+          action: "purchase",
+          userEmail: session?.email || "",
+        }),
       })
 
       if (res.ok) {
