@@ -6,7 +6,6 @@ import { ArrowLeft, Eye, EyeOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { createClient } from "@/lib/supabase/client"
 
 export default function RegisterPage() {
   const [name, setName] = useState("")
@@ -44,46 +43,37 @@ export default function RegisterPage() {
     setLoading(true)
 
     try {
-      const supabase = createClient()
-      const { data, error: signUpError } = await supabase.auth.signUp({
-        email: email.trim().toLowerCase(),
-        password,
-        options: {
-          emailRedirectTo:
-            process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL ??
-            `${window.location.origin}/auth/callback`,
-          data: {
-            name: name.trim(),
-          },
-        },
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name.trim(),
+          email: email.trim().toLowerCase(),
+          password,
+        }),
       })
 
-      if (signUpError) {
-        if (signUpError.message.toLowerCase().includes("already")) {
+      const result = await res.json()
+
+      if (!res.ok || !result.success) {
+        if (result.message?.toLowerCase().includes("cadastrado")) {
           setError("Este email já está cadastrado")
         } else {
-          setError(signUpError.message)
+          setError(result.message || "Erro ao criar conta. Tente novamente.")
         }
         return
       }
 
-      // Se já houver sessão (confirmação de email desativada), vai direto ao dashboard
-      if (data.session) {
-        localStorage.setItem(
-          "user_session",
-          JSON.stringify({
-            success: true,
-            userId: data.user?.id,
-            name: name.trim(),
-            email: email.trim().toLowerCase(),
-          })
-        )
-        window.location.href = "/dashboard"
-        return
-      }
-
-      // Caso contrário, precisa confirmar o email com o código enviado
-      window.location.href = `/auth/verificar?email=${encodeURIComponent(email.trim().toLowerCase())}`
+      localStorage.setItem(
+        "user_session",
+        JSON.stringify({
+          success: true,
+          userId: result.user?.id,
+          name: name.trim(),
+          email: email.trim().toLowerCase(),
+        })
+      )
+      window.location.href = "/dashboard"
     } catch {
       setError("Erro ao criar conta. Tente novamente.")
     } finally {

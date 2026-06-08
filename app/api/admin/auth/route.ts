@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
-import crypto from "crypto"
-import { createAdminClient } from "@/lib/supabase/admin"
+import { verifyPassword } from "@/lib/repositories/crypto"
+import { createAdminToken, revokeAdminToken } from "@/lib/repositories/admin-session"
+import { findAdminByEmail } from "@/lib/repositories/settings"
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,22 +14,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const admin = createAdminClient()
-    const { data: isValid, error } = await admin.rpc("verify_admin", {
-      p_email: String(email).toLowerCase(),
-      p_password: password,
-    })
+    const normalizedEmail = String(email).toLowerCase()
+    const admin = await findAdminByEmail(normalizedEmail)
+    const isValid = !!admin && verifyPassword(password, admin.password)
 
-    if (error) {
-      console.error("[Admin Auth] RPC error:", error)
-      return NextResponse.json(
-        { success: false, message: "Erro interno do servidor" },
-        { status: 500 }
-      )
-    }
-
-    if (isValid === true) {
-      const token = crypto.randomBytes(32).toString("hex")
+    if (isValid) {
+      const token = createAdminToken()
 
       const response = NextResponse.json({
         success: true,
@@ -59,7 +50,12 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function DELETE() {
+export async function DELETE(request: NextRequest) {
+  const cookieHeader = request.headers.get("cookie") || ""
+  const match = cookieHeader.match(/(?:^|;\s*)admin_token=([^;]+)/)
+  const token = match ? decodeURIComponent(match[1]) : null
+  revokeAdminToken(token)
+
   const response = NextResponse.json({
     success: true,
     message: "Logout realizado com sucesso",

@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createAdminClient } from "@/lib/supabase/admin"
+import { changeAdminPassword } from "@/lib/repositories/settings"
+import { isAuthenticatedAdmin } from "@/lib/admin-auth"
 
 export async function POST(request: NextRequest) {
   try {
-    // Apenas admins logados podem trocar a senha
-    const adminToken = request.cookies.get("admin_token")?.value
-    if (!adminToken) {
+    // Apenas admins logados (token válido) podem trocar a senha
+    if (!isAuthenticatedAdmin(request)) {
       return NextResponse.json(
         { success: false, message: "Nao autorizado" },
         { status: 401 }
@@ -28,22 +28,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const admin = createAdminClient()
-    const { data: success, error } = await admin.rpc("change_admin_password", {
-      p_email: String(email).toLowerCase(),
-      p_current_password: currentPassword,
-      p_new_password: newPassword,
-    })
+    const normalizedEmail = String(email).toLowerCase()
+    const changed = await changeAdminPassword(normalizedEmail, currentPassword, newPassword)
 
-    if (error) {
-      console.error("[Admin Password] RPC error:", error)
-      return NextResponse.json(
-        { success: false, message: "Erro interno do servidor" },
-        { status: 500 }
-      )
-    }
-
-    if (success === true) {
+    if (changed) {
       return NextResponse.json({
         success: true,
         message: "Senha alterada com sucesso",

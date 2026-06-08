@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { adminFetch } from "@/lib/admin-fetch"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -60,7 +61,7 @@ export default function FeedbacksPage() {
 
   const fetchFeedbacks = useCallback(async () => {
     try {
-      const res = await fetch("/api/feedbacks")
+      const res = await adminFetch("/api/feedbacks")
       if (res.ok) {
         const data = await res.json()
         setFeedbacks(data.feedbacks || [])
@@ -88,7 +89,7 @@ export default function FeedbacksPage() {
 
   const handleDeleteFeedback = async (id: string) => {
     try {
-      const res = await fetch(`/api/feedbacks?id=${id}`, { method: "DELETE" })
+      const res = await adminFetch(`/api/feedbacks?id=${id}`, { method: "DELETE" })
       if (res.ok) fetchFeedbacks()
     } catch (error) {
       console.error("Error deleting feedback:", error)

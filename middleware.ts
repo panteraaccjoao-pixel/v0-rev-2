@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
-import { updateSession } from "@/lib/supabase/proxy"
 
 // Simple in-memory rate limiter for middleware
 const ipRequestCounts = new Map<string, { count: number; resetTime: number }>()
@@ -90,8 +89,8 @@ export async function middleware(request: NextRequest) {
     )
   }
 
-  // Create response with security headers + refresh Supabase session cookies
-  const response = await updateSession(request)
+  // Create response with security headers
+  const response = NextResponse.next({ request })
 
   // Security headers
   response.headers.set("X-Frame-Options", "DENY")

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import { adminFetch } from "@/lib/admin-fetch"
 import { Send, ArrowLeft, Clock, CheckCircle2, MessageSquare, Inbox, XCircle, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -62,7 +63,7 @@ export default function AdminSuportePage() {
     if (!selectedTicket) return
 
     const interval = setInterval(async () => {
-      const res = await fetch("/api/tickets?admin=true")
+      const res = await adminFetch("/api/tickets?admin=true")
       const data = await res.json()
       const updatedTicket = data.tickets.find((t: Ticket) => t.id === selectedTicket.id)
       if (updatedTicket && updatedTicket.messages.length !== selectedTicket.messages.length) {
@@ -76,7 +77,7 @@ export default function AdminSuportePage() {
 
   const fetchTickets = async () => {
     try {
-      const res = await fetch("/api/tickets?admin=true")
+      const res = await adminFetch("/api/tickets?admin=true")
       const data = await res.json()
       setTickets(data.tickets || [])
     } catch (error) {
@@ -91,7 +92,7 @@ export default function AdminSuportePage() {
 
     setSending(true)
     try {
-      const res = await fetch("/api/tickets", {
+      const res = await adminFetch("/api/tickets", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -121,7 +122,7 @@ export default function AdminSuportePage() {
     if (!selectedTicket) return
 
     try {
-      const res = await fetch("/api/tickets", {
+      const res = await adminFetch("/api/tickets", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

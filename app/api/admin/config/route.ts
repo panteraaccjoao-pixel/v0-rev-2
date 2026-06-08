@@ -1,20 +1,11 @@
 import { NextResponse } from "next/server"
-import { createAdminClient } from "@/lib/supabase/admin"
-
-async function getConfig(key: string) {
-  const admin = createAdminClient()
-  const { data } = await admin.from("app_config").select("value").eq("key", key).maybeSingle()
-  return (data?.value as Record<string, any>) || null
-}
-
-async function saveConfig(key: string, value: Record<string, any>) {
-  const admin = createAdminClient()
-  await admin
-    .from("app_config")
-    .upsert({ key, value, updated_at: new Date().toISOString() })
-}
+import { getConfig, saveConfig } from "@/lib/repositories/settings"
+import { isAuthenticatedAdmin, unauthorizedResponse } from "@/lib/admin-auth"
 
 export async function POST(request: Request) {
+  if (!isAuthenticatedAdmin(request)) {
+    return unauthorizedResponse()
+  }
   try {
     const body = await request.json()
     const { type, config, dbConfig, gatewayConfig } = body
@@ -76,7 +67,10 @@ export async function POST(request: Request) {
   }
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  if (!isAuthenticatedAdmin(request)) {
+    return unauthorizedResponse()
+  }
   try {
     const parsedDb = await getConfig("db")
     const parsedGateway = await getConfig("gateway")

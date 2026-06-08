@@ -1,54 +1,35 @@
 import { NextRequest, NextResponse } from "next/server"
+import { createOrder, listOrders, updateOrderStatus } from "@/lib/repositories/orders"
+import type { Order } from "@/lib/repositories/types"
 
-// In-memory storage for orders (replace with database in production)
-export let orders: Order[] = []
+export type { Order } from "@/lib/repositories/types"
 
-export interface Order {
-  id: string
-  oderId: string
+// Cria um pedido diretamente (uso interno, server-to-server).
+// Mantido por compat — delega ao repositório de pedidos.
+export async function createOrderRecord(data: {
   userId: string
-  userName: string
+  userName?: string
   product: string
-  level: string
-  brand: string
-  quantity: number
-  total: number
-  date: string
-  status: "entregue" | "expirado" | "reembolsado" | "pendente"
-  cardData?: {
-    fullCard: string
-    cvv: string
-    expiry: string
-    bin: string
-    bank: string
-    holderName?: string
-    cpf?: string
-    birthDate?: string
-  }
+  level?: string
+  brand?: string
+  total?: number
+  cardData?: Order["cardData"]
+}): Promise<Order> {
+  return createOrder(data)
 }
 
-// GET - List orders
+// GET - lista pedidos (filtra por userId ou email)
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get("userId")
     const userEmail = searchParams.get("email")
 
-    let filteredOrders = orders
-
-    // Filter by userId or email if provided
-    if (userId) {
-      filteredOrders = orders.filter(o => o.userId === userId)
-    } else if (userEmail) {
-      filteredOrders = orders.filter(o => o.userId === userEmail || o.userName.toLowerCase().includes(userEmail.toLowerCase()))
-    }
-
-    // Sort by date (newest first)
-    filteredOrders.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    const filteredOrders = await listOrders({ userId, email: userEmail })
 
     return NextResponse.json({
       orders: filteredOrders,
-      total: filteredOrders.length
+      total: filteredOrders.length,
     })
   } catch (error) {
     console.error("Error fetching orders:", error)
@@ -56,7 +37,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST - Create new order (called after purchase)
+// POST - cria um novo pedido (chamado após uma compra)
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -66,52 +47,35 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }
 
-    const newOrder: Order = {
-      id: `order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      oderId: `#${Math.random().toString(36).substr(2, 8).toUpperCase()}`,
+    const newOrder = await createOrder({
       userId,
-      userName: userName || "Cliente",
+      userName,
       product,
-      level: level || "Standard",
-      brand: brand || "visa",
-      quantity: 1,
-      total: total || 0,
-      date: new Date().toISOString(),
-      status: "entregue",
-      cardData
-    }
-
-    orders.push(newOrder)
-
-    return NextResponse.json({ 
-      success: true, 
-      order: newOrder 
+      level,
+      brand,
+      total,
+      cardData,
     })
+
+    return NextResponse.json({ success: true, order: newOrder })
   } catch (error) {
     console.error("Error creating order:", error)
     return NextResponse.json({ error: "Failed to create order" }, { status: 500 })
   }
 }
 
-// PATCH - Update order status
+// PATCH - atualiza o status de um pedido
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json()
     const { id, status } = body
 
-    const orderIndex = orders.findIndex(o => o.id === id)
-    if (orderIndex === -1) {
+    const updated = await updateOrderStatus(id, status)
+    if (!updated) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 })
     }
 
-    if (status) {
-      orders[orderIndex].status = status
-    }
-
-    return NextResponse.json({ 
-      success: true, 
-      order: orders[orderIndex] 
-    })
+    return NextResponse.json({ success: true, order: updated })
   } catch (error) {
     console.error("Error updating order:", error)
     return NextResponse.json({ error: "Failed to update order" }, { status: 500 })

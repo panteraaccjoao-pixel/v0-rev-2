@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { adminFetch } from "@/lib/admin-fetch"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -18,7 +19,11 @@ import {
   RefreshCw,
   DollarSign,
   ShoppingCart,
-  MessageCircle
+  MessageCircle,
+  CreditCard,
+  Package,
+  Copy,
+  Check
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -54,6 +59,30 @@ interface User {
   discordId?: string
 }
 
+interface Order {
+  id: string
+  oderId: string
+  userId: string
+  userName: string
+  product: string
+  level: string
+  brand: string
+  quantity: number
+  total: number
+  date: string
+  status: "entregue" | "expirado" | "reembolsado" | "pendente"
+  cardData?: {
+    fullCard: string
+    cvv: string
+    expiry: string
+    bin: string
+    bank: string
+    holderName?: string
+    cpf?: string
+    birthDate?: string
+  }
+}
+
 export default function UsuariosPage() {
   const [search, setSearch] = useState("")
   const [users, setUsers] = useState<User[]>([])
@@ -65,10 +94,44 @@ export default function UsuariosPage() {
   const [isEditBalanceOpen, setIsEditBalanceOpen] = useState(false)
   const [newBalance, setNewBalance] = useState("")
   const [updating, setUpdating] = useState(false)
+  const [userOrders, setUserOrders] = useState<Order[]>([])
+  const [loadingOrders, setLoadingOrders] = useState(false)
+  const [copiedField, setCopiedField] = useState<string | null>(null)
+
+  const fetchUserOrders = useCallback(async (user: User) => {
+    setLoadingOrders(true)
+    setUserOrders([])
+    try {
+      const params = new URLSearchParams()
+      if (user.id) params.set("userId", user.id)
+      if (user.email) params.set("email", user.email)
+      const res = await adminFetch(`/api/pedidos?${params.toString()}`)
+      if (res.ok) {
+        const data = await res.json()
+        setUserOrders(data.orders || [])
+      }
+    } catch (error) {
+      console.error("Error fetching user orders:", error)
+    } finally {
+      setLoadingOrders(false)
+    }
+  }, [])
+
+  const handleViewDetails = (user: User) => {
+    setSelectedUser(user)
+    setIsDialogOpen(true)
+    fetchUserOrders(user)
+  }
+
+  const copyToClipboard = (text: string, field: string) => {
+    navigator.clipboard.writeText(text)
+    setCopiedField(field)
+    setTimeout(() => setCopiedField(null), 1500)
+  }
 
   const fetchUsers = useCallback(async () => {
     try {
-      const res = await fetch("/api/users")
+      const res = await adminFetch("/api/users")
       if (res.ok) {
         const data = await res.json()
         setUsers(data.users || [])
@@ -92,7 +155,7 @@ export default function UsuariosPage() {
 
   const handleBlockUser = async (userId: string) => {
     try {
-      const res = await fetch("/api/users", {
+      const res = await adminFetch("/api/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "block", userId })
@@ -105,7 +168,7 @@ export default function UsuariosPage() {
 
   const handleUnblockUser = async (userId: string) => {
     try {
-      const res = await fetch("/api/users", {
+      const res = await adminFetch("/api/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "unblock", userId })
@@ -118,7 +181,7 @@ export default function UsuariosPage() {
 
   const handleDeleteUser = async (userId: string) => {
     try {
-      const res = await fetch(`/api/users?id=${userId}`, { method: "DELETE" })
+      const res = await adminFetch(`/api/users?id=${userId}`, { method: "DELETE" })
       if (res.ok) fetchUsers()
     } catch (error) {
       console.error("Error deleting user:", error)
@@ -129,7 +192,7 @@ export default function UsuariosPage() {
     if (!selectedUser) return
     setUpdating(true)
     try {
-      const res = await fetch("/api/users", {
+      const res = await adminFetch("/api/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
@@ -311,10 +374,7 @@ export default function UsuariosPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="bg-card border-border">
-                        <DropdownMenuItem onClick={() => {
-                          setSelectedUser(user)
-                          setIsDialogOpen(true)
-                        }}>
+                        <DropdownMenuItem onClick={() => handleViewDetails(user)}>
                           <Eye className="mr-2 h-4 w-4" />
                           Ver detalhes
                         </DropdownMenuItem>
@@ -362,11 +422,11 @@ export default function UsuariosPage() {
 
       {/* View User Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="bg-card border-border max-w-2xl">
+        <DialogContent className="bg-card border-border max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Detalhes do Usuário</DialogTitle>
             <DialogDescription>
-              Informações completas do usuário
+              Informações completas e histórico de pedidos
             </DialogDescription>
           </DialogHeader>
           {selectedUser && (
@@ -396,6 +456,147 @@ export default function UsuariosPage() {
                   <Label className="text-muted-foreground">Data de Cadastro</Label>
                   <p className="font-medium">{formatDate(selectedUser.createdAt)}</p>
                 </div>
+              </div>
+
+              {/* Histórico de pedidos e detalhes de entrega */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 border-t border-border pt-4">
+                  <Package className="h-4 w-4 text-accent" />
+                  <h4 className="font-semibold">Pedidos e Entregas</h4>
+                  <span className="text-sm text-muted-foreground">
+                    ({userOrders.length})
+                  </span>
+                </div>
+
+                {loadingOrders ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="h-6 w-6 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+                  </div>
+                ) : userOrders.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border py-8 text-center">
+                    <ShoppingCart className="h-8 w-8 text-muted-foreground/50 mb-2" />
+                    <p className="text-sm text-muted-foreground">
+                      Este usuário ainda não fez nenhum pedido
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {userOrders.map((order) => (
+                      <div
+                        key={order.id}
+                        className="rounded-lg border border-border bg-secondary/50 p-4"
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <p className="font-medium">{order.product}</p>
+                            <p className="text-xs text-muted-foreground font-mono">
+                              {order.oderId} · {formatDate(order.date)}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-medium text-accent">
+                              {formatCurrency(order.total)}
+                            </p>
+                            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
+                              order.status === "entregue"
+                                ? "bg-green-500/20 text-green-500"
+                                : order.status === "pendente"
+                                ? "bg-yellow-500/20 text-yellow-500"
+                                : "bg-red-500/20 text-red-500"
+                            }`}>
+                              {order.status}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Dados da entrega (cartão) */}
+                        {order.cardData ? (
+                          <div className="mt-3 space-y-2 rounded-md border border-border bg-background p-3">
+                            <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                              <CreditCard className="h-3.5 w-3.5" />
+                              Dados entregues
+                            </div>
+                            <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                              <DeliveryField
+                                label="Número"
+                                value={order.cardData.fullCard}
+                                fieldId={`${order.id}-card`}
+                                copiedField={copiedField}
+                                onCopy={copyToClipboard}
+                                mono
+                              />
+                              <DeliveryField
+                                label="Validade"
+                                value={order.cardData.expiry}
+                                fieldId={`${order.id}-exp`}
+                                copiedField={copiedField}
+                                onCopy={copyToClipboard}
+                                mono
+                              />
+                              <DeliveryField
+                                label="CVV"
+                                value={order.cardData.cvv}
+                                fieldId={`${order.id}-cvv`}
+                                copiedField={copiedField}
+                                onCopy={copyToClipboard}
+                                mono
+                              />
+                              <DeliveryField
+                                label="BIN"
+                                value={order.cardData.bin}
+                                fieldId={`${order.id}-bin`}
+                                copiedField={copiedField}
+                                onCopy={copyToClipboard}
+                                mono
+                              />
+                              {order.cardData.bank && (
+                                <DeliveryField
+                                  label="Banco"
+                                  value={order.cardData.bank}
+                                  fieldId={`${order.id}-bank`}
+                                  copiedField={copiedField}
+                                  onCopy={copyToClipboard}
+                                />
+                              )}
+                              {order.cardData.holderName && (
+                                <DeliveryField
+                                  label="Titular"
+                                  value={order.cardData.holderName}
+                                  fieldId={`${order.id}-holder`}
+                                  copiedField={copiedField}
+                                  onCopy={copyToClipboard}
+                                />
+                              )}
+                              {order.cardData.cpf && (
+                                <DeliveryField
+                                  label="CPF"
+                                  value={order.cardData.cpf}
+                                  fieldId={`${order.id}-cpf`}
+                                  copiedField={copiedField}
+                                  onCopy={copyToClipboard}
+                                  mono
+                                />
+                              )}
+                              {order.cardData.birthDate && (
+                                <DeliveryField
+                                  label="Nascimento"
+                                  value={order.cardData.birthDate}
+                                  fieldId={`${order.id}-birth`}
+                                  copiedField={copiedField}
+                                  onCopy={copyToClipboard}
+                                />
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="mt-3 text-xs text-muted-foreground">
+                            Sem dados de entrega registrados para este pedido.
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -433,6 +634,41 @@ export default function UsuariosPage() {
           </div>
         </DialogContent>
       </Dialog>
+    </div>
+  )
+}
+
+function DeliveryField({
+  label,
+  value,
+  fieldId,
+  copiedField,
+  onCopy,
+  mono,
+}: {
+  label: string
+  value: string
+  fieldId: string
+  copiedField: string | null
+  onCopy: (text: string, field: string) => void
+  mono?: boolean
+}) {
+  return (
+    <div>
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <button
+        type="button"
+        onClick={() => onCopy(value, fieldId)}
+        className="flex items-center gap-1.5 text-left hover:text-accent transition-colors"
+        title="Copiar"
+      >
+        <span className={mono ? "font-mono" : ""}>{value}</span>
+        {copiedField === fieldId ? (
+          <Check className="h-3 w-3 text-green-500 shrink-0" />
+        ) : (
+          <Copy className="h-3 w-3 text-muted-foreground shrink-0" />
+        )}
+      </button>
     </div>
   )
 }

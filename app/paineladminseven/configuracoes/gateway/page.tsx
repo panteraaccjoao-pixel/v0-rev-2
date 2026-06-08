@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { adminFetch } from "@/lib/admin-fetch"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -54,7 +55,7 @@ export default function GatewayPage() {
   useEffect(() => {
     async function loadConfig() {
       try {
-        const res = await fetch("/api/admin/config")
+        const res = await adminFetch("/api/admin/config")
         const data = await res.json()
         if (data.gatewayConfig) {
           setConfig({
@@ -86,7 +87,7 @@ export default function GatewayPage() {
     setTestResult(null)
     
     try {
-      const res = await fetch("/api/admin/test-gateway", {
+      const res = await adminFetch("/api/admin/test-gateway", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(config),
@@ -109,7 +110,7 @@ export default function GatewayPage() {
     setSaveMessage(null)
     
     try {
-      const res = await fetch("/api/admin/config", {
+      const res = await adminFetch("/api/admin/config", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type: "gateway", config }),

@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server"
+import { findPixPayment } from "@/lib/repositories/pix"
+import { confirmPayment } from "@/app/api/pix/route"
 
 // This webhook receives payment notifications from your gateway
 // Configure this URL in your gateway's webhook settings
@@ -94,7 +96,23 @@ export async function POST(request: Request) {
     // Process the payment
     if (paymentData.status === "approved" && paymentData.amount > 0) {
       console.log("[Webhook] Payment approved:", paymentData)
-      
+
+      // Confirma o pagamento no nosso store: credita saldo (recarga)
+      // ou entrega os cartões e baixa o estoque (compra).
+      const paymentId = paymentData.externalId || paymentData.id
+      const payment = paymentId ? await findPixPayment(String(paymentId)) : null
+
+      if (payment && payment.status !== "paid") {
+        try {
+          await confirmPayment(payment)
+          console.log("[Webhook] Payment confirmed and fulfilled:", payment.id, payment.purpose)
+        } catch (fulfillError) {
+          console.error("[Webhook] Failed to fulfill payment:", fulfillError)
+        }
+      } else if (!payment) {
+        console.warn("[Webhook] Payment not found in store for id:", paymentId)
+      }
+
       // Update dashboard stats in real-time
       try {
         const baseUrl = process.env.VERCEL_URL 

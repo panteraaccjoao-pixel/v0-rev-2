@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { adminFetch } from "@/lib/admin-fetch"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -180,7 +181,7 @@ export default function EstoquePage() {
 
   const fetchProducts = useCallback(async () => {
     try {
-      const res = await fetch(`/api/estoque${search ? `?search=${search}` : ""}`)
+      const res = await adminFetch(`/api/estoque${search ? `?search=${search}` : ""}`)
       if (res.ok) {
         const data = await res.json()
         setProducts(data.products || [])
@@ -205,7 +206,7 @@ export default function EstoquePage() {
   const handleAddProduct = async () => {
     setAdding(true)
     try {
-      const res = await fetch("/api/estoque", {
+      const res = await adminFetch("/api/estoque", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(newProduct)
@@ -239,7 +240,7 @@ export default function EstoquePage() {
 
   const handleDeleteProduct = async (id: string) => {
     try {
-      const res = await fetch(`/api/estoque?id=${id}`, {
+      const res = await adminFetch(`/api/estoque?id=${id}`, {
         method: "DELETE"
       })
 
@@ -260,7 +261,7 @@ export default function EstoquePage() {
     if (!editingProduct) return
     
     try {
-      const res = await fetch("/api/estoque", {
+      const res = await adminFetch("/api/estoque", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(editingProduct)

@@ -21,7 +21,6 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { createClient } from "@/lib/supabase/client"
 
 const platformItems = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -59,7 +58,6 @@ export default function DashboardLayout({
 
   useEffect(() => {
     let active = true
-    const supabase = createClient()
 
     const redirectToLogin = () => {
       if (!active) return
@@ -72,24 +70,24 @@ export default function DashboardLayout({
       }, 400)
     }
 
-    const checkAuth = async () => {
-      const {
-        data: { user: authUser },
-      } = await supabase.auth.getUser()
+    const checkAuth = () => {
+      try {
+        const raw = localStorage.getItem("user_session")
+        const session = raw ? JSON.parse(raw) : null
 
-      if (!active) return
+        if (!active) return
 
-      if (!authUser) {
-        try {
-          localStorage.removeItem("user_session")
-        } catch {}
+        if (!session?.success) {
+          redirectToLogin()
+          return
+        }
+
+        const name = session.name || session.email || "Usuário"
+        setUser({ name, email: session.email || "" })
+        setCheckingAuth(false)
+      } catch {
         redirectToLogin()
-        return
       }
-
-      const name = (authUser.user_metadata?.name as string) || authUser.email || "Usuário"
-      setUser({ name, email: authUser.email || "" })
-      setCheckingAuth(false)
     }
 
     checkAuth()
@@ -109,9 +107,7 @@ export default function DashboardLayout({
     }
   }, [router])
 
-  const handleLogout = async () => {
-    const supabase = createClient()
-    await supabase.auth.signOut()
+  const handleLogout = () => {
     try {
       localStorage.removeItem("user_session")
     } catch {}

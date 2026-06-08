@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { adminFetch } from "@/lib/admin-fetch"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -97,7 +98,7 @@ export default function ComprasPage() {
 
   const fetchCompras = useCallback(async () => {
     try {
-      const res = await fetch("/api/compras")
+      const res = await adminFetch("/api/compras")
       if (res.ok) {
         const data = await res.json()
         setCompras(data.compras || [])

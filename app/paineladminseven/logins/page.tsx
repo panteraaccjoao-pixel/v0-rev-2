@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { adminFetch } from "@/lib/admin-fetch"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -35,7 +36,7 @@ export default function LoginsPage() {
 
   const fetchLogins = async () => {
     try {
-      const res = await fetch(`/api/admin/logins?search=${encodeURIComponent(search)}`)
+      const res = await adminFetch(`/api/admin/logins?search=${encodeURIComponent(search)}`)
       if (res.ok) {
         const data = await res.json()
         setLogins(data.logins)
@@ -60,7 +61,7 @@ export default function LoginsPage() {
     if (!confirm("Tem certeza que deseja limpar todo o histórico de logins?")) return
     
     try {
-      const res = await fetch("/api/admin/logins", { method: "DELETE" })
+      const res = await adminFetch("/api/admin/logins", { method: "DELETE" })
       if (res.ok) {
         setLogins([])
         setStats({ totalToday: 0, totalAll: 0, desktopPercent: 0, mobilePercent: 0 })
