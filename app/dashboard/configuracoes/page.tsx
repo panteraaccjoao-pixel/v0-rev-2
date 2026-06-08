@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { User, Shield, Palette, LogOut, MessageCircle, Check, X, Loader2, ExternalLink } from "lucide-react"
-import { getSessionEmail, setSessionProfile } from "@/lib/session"
+import { setSessionProfile, authFetch } from "@/lib/session"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"

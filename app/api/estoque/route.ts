@@ -10,6 +10,7 @@ import type { Product } from "@/lib/repositories/types"
 import { createOrder } from "@/lib/repositories/orders"
 import { getUserByEmail, setBalance, recordPurchase } from "@/lib/repositories/users"
 import { isAuthenticatedAdmin, unauthorizedResponse } from "@/lib/admin-auth"
+import { requireUser } from "@/lib/user-auth"
 
 // Monta a visão pública (mascarada) de um grupo de produtos. NUNCA inclui
 // dados sensíveis (número completo, CVV, CPF, nome/validade completos).
@@ -169,18 +170,20 @@ export async function PUT(request: NextRequest) {
 // e o consumo indevido do estoque.
 export async function PATCH(request: NextRequest) {
   try {
+    // Identidade vem da sessão assinada — nunca do corpo da requisição.
+    const session = requireUser(request)
+    if (!session) {
+      return NextResponse.json({ error: "Faça login para comprar" }, { status: 401 })
+    }
+
     const body = await request.json()
-    const { id, action, userEmail } = body
+    const { id, action } = body
 
     if (action !== "purchase") {
       return NextResponse.json({ error: "Ação inválida" }, { status: 400 })
     }
 
-    // Exige um usuário real (perfil existente). Sem isso, não há compra.
-    if (!userEmail) {
-      return NextResponse.json({ error: "Faça login para comprar" }, { status: 401 })
-    }
-    const profile = await getUserByEmail(userEmail)
+    const profile = await getUserByEmail(session.email.toLowerCase())
     if (!profile) {
       return NextResponse.json({ error: "Usuário não encontrado. Faça login novamente." }, { status: 401 })
     }
