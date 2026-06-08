@@ -14,6 +14,7 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { authFetch } from "@/lib/session"
 
 interface RecentSale {
   id: string
@@ -44,7 +45,7 @@ export default function DashboardPage() {
 
   const fetchDiscordStatus = useCallback(async () => {
     try {
-      const res = await fetch("/api/user/discord")
+      const res = await authFetch("/api/user/discord")
       if (res.ok) {
         const data = await res.json()
         setDiscordLinked(!!data.linked)
@@ -68,13 +69,8 @@ export default function DashboardPage() {
 
   const fetchBalance = useCallback(async () => {
     try {
-      let email = ""
-      try {
-        const raw = localStorage.getItem("user_session")
-        email = raw ? JSON.parse(raw).email || "" : ""
-      } catch {}
-
-      const res = await fetch(`/api/user/balance?email=${encodeURIComponent(email)}`)
+      // Identidade vem da sessão (cookie/token) — não enviamos e-mail.
+      const res = await authFetch("/api/user/balance")
       if (res.ok) {
         const data = await res.json()
         setUserBalance(data.balance || 0)
@@ -86,24 +82,8 @@ export default function DashboardPage() {
 
   const fetchOrders = useCallback(async () => {
     try {
-      let email = ""
-      let userId = ""
-      try {
-        const raw = localStorage.getItem("user_session")
-        if (raw) {
-          const session = JSON.parse(raw)
-          email = session.email || ""
-          userId = session.userId || session.user?.id || session.id || ""
-        }
-      } catch {}
-
-      if (!email && !userId) return
-
-      const params = new URLSearchParams()
-      if (userId) params.set("userId", userId)
-      if (email) params.set("email", email)
-
-      const res = await fetch(`/api/pedidos?${params.toString()}`)
+      // O servidor escopa os pedidos ao usuário autenticado.
+      const res = await authFetch("/api/pedidos")
       if (!res.ok) return
 
       const data = await res.json()

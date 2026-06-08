@@ -5,6 +5,7 @@ import { Plus, Inbox, Send, ArrowLeft, Clock, CheckCircle2, MessageSquare, X } f
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { authFetch } from "@/lib/session"
 import {
   Select,
   SelectContent,
@@ -90,7 +91,7 @@ export default function TicketsPage() {
     if (!selectedTicket || !user) return
 
     const interval = setInterval(async () => {
-      const res = await fetch(`/api/tickets?userId=${user.userId}`)
+      const res = await authFetch("/api/tickets")
       const data = await res.json()
       const updatedTicket = data.tickets.find((t: Ticket) => t.id === selectedTicket.id)
       if (updatedTicket && updatedTicket.messages.length !== selectedTicket.messages.length) {
@@ -105,7 +106,7 @@ export default function TicketsPage() {
   const fetchTickets = async () => {
     if (!user) return
     try {
-      const res = await fetch(`/api/tickets?userId=${user.userId}`)
+      const res = await authFetch("/api/tickets")
       const data = await res.json()
       setTickets(data.tickets || [])
     } catch (error) {
@@ -120,13 +121,11 @@ export default function TicketsPage() {
 
     setCreating(true)
     try {
-      const res = await fetch("/api/tickets", {
+      const res = await authFetch("/api/tickets", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "create",
-          userId: user.userId,
-          username: user.name,
           subject: newTicket.subject,
           category: newTicket.category,
           message: newTicket.message,
@@ -152,14 +151,12 @@ export default function TicketsPage() {
 
     setSending(true)
     try {
-      const res = await fetch("/api/tickets", {
+      const res = await authFetch("/api/tickets", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "reply",
           ticketId: selectedTicket.id,
-          senderId: user.userId,
-          senderName: user.name,
           senderType: "user",
           content: newMessage,
         }),

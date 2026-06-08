@@ -18,7 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { getSession } from "@/lib/session"
+import { authFetch } from "@/lib/session"
 
 interface ProductGroup {
   level: string
@@ -103,15 +103,13 @@ export default function ComprarCartoesPage() {
       // Get the first available card from this product group
       const cardId = selectedProduct.products[0].id
 
-      // Envia o e-mail da sessão: o backend exige um usuário válido e cobra do saldo.
-      const session = getSession()
-      const res = await fetch("/api/estoque", {
+      // Identidade vem da sessão (cookie/token). O backend valida usuário e saldo.
+      const res = await authFetch("/api/estoque", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           id: cardId,
           action: "purchase",
-          userEmail: session?.email || "",
         }),
       })
 

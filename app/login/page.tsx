@@ -6,6 +6,7 @@ import { ArrowLeft, Eye, EyeOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { saveSession } from "@/lib/session"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -34,15 +35,12 @@ export default function LoginPage() {
       }
 
       const name = result.user?.name || result.user?.email || "Usuário"
-      localStorage.setItem(
-        "user_session",
-        JSON.stringify({
-          success: true,
-          userId: result.user?.id,
-          name,
-          email: result.user?.email,
-        })
-      )
+      saveSession({
+        userId: result.user?.id,
+        name,
+        email: result.user?.email,
+        token: result.token,
+      })
       // Hard navigation ensures it works even inside the preview iframe
       window.location.href = "/dashboard"
     } catch (err) {

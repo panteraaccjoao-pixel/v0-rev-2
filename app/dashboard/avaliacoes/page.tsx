@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react"
 import { Star, ThumbsUp, MessageCircle, CreditCard, ImagePlus, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { authFetch } from "@/lib/session"
 import {
   Dialog,
   DialogContent,
@@ -122,16 +123,12 @@ export default function AvaliacoesPage() {
     setSubmitting(true)
     setUploadError(null)
     try {
-      const session = localStorage.getItem("user_session")
-      const userData = session ? JSON.parse(session) : {}
-      const username = userData.user?.name || userData.name || "Usuário"
-
       // Faz o upload da imagem primeiro (se houver)
       let imageUrl: string | null = null
       if (imageFile) {
         const fd = new FormData()
         fd.append("file", imageFile)
-        const uploadRes = await fetch("/api/reviews/upload", {
+        const uploadRes = await authFetch("/api/reviews/upload", {
           method: "POST",
           body: fd,
         })
@@ -144,11 +141,10 @@ export default function AvaliacoesPage() {
         imageUrl = uploadData.url
       }
 
-      const res = await fetch("/api/reviews", {
+      const res = await authFetch("/api/reviews", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          username,
           rating: newReview.rating,
           comment: newReview.comment,
           productType: newReview.productType,
@@ -171,7 +167,7 @@ export default function AvaliacoesPage() {
 
   const handleHelpful = async (reviewId: string) => {
     try {
-      await fetch("/api/reviews", {
+      await authFetch("/api/reviews", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ reviewId }),

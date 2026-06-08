@@ -40,6 +40,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  if (!isAuthenticatedAdmin(request) && !isInternalRequest(request)) return unauthorizedResponse()
   try {
     const body = await request.json()
     const { action, compraId, ...data } = body
@@ -78,6 +79,7 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  if (!isAuthenticatedAdmin(request)) return unauthorizedResponse()
   const { searchParams } = new URL(request.url)
   const id = searchParams.get("id")
 

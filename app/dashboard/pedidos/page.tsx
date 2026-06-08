@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { CreditCard, Eye, ShoppingBag, X, Copy, Check } from "lucide-react"
-import { getSession } from "@/lib/session"
+import { authFetch } from "@/lib/session"
 import { Button } from "@/components/ui/button"
 import {
   Select,
@@ -81,19 +81,8 @@ export default function PedidosPage() {
 
   const fetchOrders = useCallback(async () => {
     try {
-      // Usa a sessão real do usuário (não um id fixo).
-      const session = getSession()
-      const params = new URLSearchParams()
-      if (session?.userId) params.set("userId", session.userId)
-      if (session?.email) params.set("email", session.email)
-
-      // Sem sessão não há pedidos para buscar.
-      if (![...params].length) {
-        setOrders([])
-        return
-      }
-
-      const res = await fetch(`/api/pedidos?${params.toString()}`)
+      // O servidor escopa os pedidos ao usuário autenticado (cookie/token).
+      const res = await authFetch("/api/pedidos")
       if (res.ok) {
         const data = await res.json()
         setOrders(data.orders || [])
