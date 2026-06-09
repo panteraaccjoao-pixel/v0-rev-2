@@ -54,11 +54,11 @@ function pick<T>(arr: T[], rand: () => number): T {
   return arr[Math.floor(rand() * arr.length)]
 }
 
-function makeFakeSale(secondsAgo: number, rand: () => number): RecentSale {
+function makeFakeSale(secondsAgo: number, rand: () => number, user: string): RecentSale {
   const lvl = pick(FAKE_LEVELS, rand)
   return {
     id: `fake_${secondsAgo}_${Math.floor(rand() * 1e9).toString(36)}`,
-    user: pick(FAKE_USERS, rand),
+    user,
     product: `${lvl.level} ${pick(FAKE_BRANDS, rand)}`,
     value: lvl.value,
     date: new Date(Date.now() - secondsAgo * 1000).toISOString(),
@@ -78,11 +78,23 @@ function seededRandom(seed: number): () => number {
   }
 }
 
+// Embaralha uma cópia do array com Fisher-Yates usando o rand fornecido.
+function shuffle<T>(arr: T[], rand: () => number): T[] {
+  const a = [...arr]
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1))
+    ;[a[i], a[j]] = [a[j], a[i]]
+  }
+  return a
+}
+
 // Lista inicial: 10 vendas populadas com horários escalonados. Determinística.
+// Cada venda usa um nome de usuário DIFERENTE (sem repetição).
 function makeInitialFakeSales(): RecentSale[] {
   const rand = seededRandom(20260609)
   const offsets = [8, 45, 130, 320, 540, 900, 1500, 2400, 3600, 5400]
-  return offsets.map((s) => makeFakeSale(s, rand))
+  const users = shuffle(FAKE_USERS, rand)
+  return offsets.map((s, i) => makeFakeSale(s, rand, users[i]))
 }
 
 export default function DashboardPage() {
