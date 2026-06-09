@@ -78,10 +78,10 @@ function seededRandom(seed: number): () => number {
   }
 }
 
-// Lista inicial: vendas populadas com horários escalonados. Determinística.
+// Lista inicial: 10 vendas populadas com horários escalonados. Determinística.
 function makeInitialFakeSales(): RecentSale[] {
   const rand = seededRandom(20260609)
-  const offsets = [8, 45, 130, 320, 540, 900, 1500]
+  const offsets = [8, 45, 130, 320, 540, 900, 1500, 2400, 3600, 5400]
   return offsets.map((s) => makeFakeSale(s, rand))
 }
 
@@ -116,9 +116,10 @@ export default function DashboardPage() {
         const realSales: RecentSale[] = data.recentSales || []
         if (realSales.length > 0) {
           // Mescla vendas reais (no topo) com as simuladas, evitando duplicar.
+          // Mantém no máximo 10 itens no total.
           setRecentSales((prev) => {
             const fakes = prev.filter((s) => s.id.startsWith("fake_"))
-            return [...realSales, ...fakes].slice(0, 12)
+            return [...realSales, ...fakes].slice(0, 10)
           })
         }
       }
@@ -187,23 +188,6 @@ export default function DashboardPage() {
 
     return () => clearInterval(interval)
   }, [fetchRecentSales, fetchBalance, fetchDiscordStatus, fetchOrders])
-
-  // Mantém o feed "vivo": injeta uma nova venda simulada a cada 6-15s,
-  // no topo da lista, preservando as vendas reais existentes.
-  useEffect(() => {
-    let timeoutId: ReturnType<typeof setTimeout>
-
-    const scheduleNext = () => {
-      const delay = 6000 + Math.random() * 9000
-      timeoutId = setTimeout(() => {
-        setRecentSales((prev) => [makeFakeSale(0, Math.random), ...prev].slice(0, 12))
-        scheduleNext()
-      }, delay)
-    }
-
-    scheduleNext()
-    return () => clearTimeout(timeoutId)
-  }, [])
 
   // Mask username for privacy
   const maskUsername = (username: string) => {
