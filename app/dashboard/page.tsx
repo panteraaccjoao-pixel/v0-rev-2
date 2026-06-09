@@ -41,30 +41,48 @@ const FAKE_USERS = [
   "vinicius", "amanda.s", "matheus_", "isadora", "gustavo.h", "larissa",
   "rodrigo_", "beatriz.c", "diego.fs", "natalia_", "henrique", "juliana.m",
 ]
-const FAKE_PRODUCTS = [
-  "Platinum visa", "Gold mastercard", "Black visa", "Standard visa",
-  "Platinum mastercard", "Infinite visa", "Gold visa", "Business mastercard",
+// Cada nível tem um valor fixo. O produto exibido leva nível + bandeira.
+const FAKE_LEVELS = [
+  { level: "Standard", value: 25 },
+  { level: "Platinum", value: 50 },
+  { level: "Black", value: 70 },
+  { level: "Infinite", value: 85 },
 ]
-const FAKE_VALUES = [25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100, 120]
+const FAKE_BRANDS = ["visa", "mastercard"]
 
-function pick<T>(arr: T[]): T {
-  return arr[Math.floor(Math.random() * arr.length)]
+function pick<T>(arr: T[], rand: () => number): T {
+  return arr[Math.floor(rand() * arr.length)]
 }
 
-function makeFakeSale(secondsAgo: number): RecentSale {
+function makeFakeSale(secondsAgo: number, rand: () => number): RecentSale {
+  const lvl = pick(FAKE_LEVELS, rand)
   return {
-    id: `fake_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-    user: pick(FAKE_USERS),
-    product: pick(FAKE_PRODUCTS),
-    value: pick(FAKE_VALUES),
+    id: `fake_${secondsAgo}_${Math.floor(rand() * 1e9).toString(36)}`,
+    user: pick(FAKE_USERS, rand),
+    product: `${lvl.level} ${pick(FAKE_BRANDS, rand)}`,
+    value: lvl.value,
     date: new Date(Date.now() - secondsAgo * 1000).toISOString(),
   }
 }
 
-// Lista inicial: algumas vendas já populadas com horários escalonados.
+// Gerador pseudo-aleatório com semente FIXA (mulberry32). Garante que a lista
+// inicial seja sempre a mesma — não muda ao dar F5 na página.
+function seededRandom(seed: number): () => number {
+  let a = seed
+  return () => {
+    a |= 0
+    a = (a + 0x6d2b79f5) | 0
+    let t = Math.imul(a ^ (a >>> 15), 1 | a)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+// Lista inicial: vendas populadas com horários escalonados. Determinística.
 function makeInitialFakeSales(): RecentSale[] {
+  const rand = seededRandom(20260609)
   const offsets = [8, 45, 130, 320, 540, 900, 1500]
-  return offsets.map((s) => makeFakeSale(s))
+  return offsets.map((s) => makeFakeSale(s, rand))
 }
 
 export default function DashboardPage() {
@@ -178,7 +196,7 @@ export default function DashboardPage() {
     const scheduleNext = () => {
       const delay = 6000 + Math.random() * 9000
       timeoutId = setTimeout(() => {
-        setRecentSales((prev) => [makeFakeSale(0), ...prev].slice(0, 12))
+        setRecentSales((prev) => [makeFakeSale(0, Math.random), ...prev].slice(0, 12))
         scheduleNext()
       }, delay)
     }
