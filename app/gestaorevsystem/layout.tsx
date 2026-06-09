@@ -25,26 +25,26 @@ import { cn } from "@/lib/utils"
 import { AdminAuthGuard } from "@/components/admin-auth-guard"
 
 const sidebarItems = [
-  { name: "Dashboard", href: "/paineladminseven", icon: LayoutDashboard },
-  { name: "Usuários", href: "/paineladminseven/usuarios", icon: Users },
-  { name: "Recargas", href: "/paineladminseven/recargas", icon: Wallet },
-  { name: "Estoque", href: "/paineladminseven/estoque", icon: Package },
-  { name: "Drops", href: "/paineladminseven/drops", icon: Zap },
-  { name: "Logins", href: "/paineladminseven/logins", icon: KeyRound },
-  { name: "Compras", href: "/paineladminseven/compras", icon: ShoppingCart },
-  { name: "Trocas", href: "/paineladminseven/trocas", icon: RefreshCw },
-  { name: "Cupons", href: "/paineladminseven/cupons", icon: Ticket },
-  { name: "Gifts", href: "/paineladminseven/gifts", icon: Gift },
-  { name: "Feedbacks", href: "/paineladminseven/feedbacks", icon: MessageSquare },
-  { name: "Suporte", href: "/paineladminseven/suporte", icon: HeadphonesIcon },
+  { name: "Dashboard", href: "/gestaorevsystem", icon: LayoutDashboard },
+  { name: "Usuários", href: "/gestaorevsystem/usuarios", icon: Users },
+  { name: "Recargas", href: "/gestaorevsystem/recargas", icon: Wallet },
+  { name: "Estoque", href: "/gestaorevsystem/estoque", icon: Package },
+  { name: "Drops", href: "/gestaorevsystem/drops", icon: Zap },
+  { name: "Logins", href: "/gestaorevsystem/logins", icon: KeyRound },
+  { name: "Compras", href: "/gestaorevsystem/compras", icon: ShoppingCart },
+  { name: "Trocas", href: "/gestaorevsystem/trocas", icon: RefreshCw },
+  { name: "Cupons", href: "/gestaorevsystem/cupons", icon: Ticket },
+  { name: "Gifts", href: "/gestaorevsystem/gifts", icon: Gift },
+  { name: "Feedbacks", href: "/gestaorevsystem/feedbacks", icon: MessageSquare },
+  { name: "Suporte", href: "/gestaorevsystem/suporte", icon: HeadphonesIcon },
   { 
     name: "Configurações", 
-    href: "/paineladminseven/configuracoes", 
+    href: "/gestaorevsystem/configuracoes", 
     icon: Settings,
     subItems: [
-      { name: "Geral", href: "/paineladminseven/configuracoes" },
-      { name: "Banco de Dados", href: "/paineladminseven/configuracoes/banco-de-dados", icon: Database },
-      { name: "Gateway PIX", href: "/paineladminseven/configuracoes/gateway", icon: CreditCard },
+      { name: "Geral", href: "/gestaorevsystem/configuracoes" },
+      { name: "Banco de Dados", href: "/gestaorevsystem/configuracoes/banco-de-dados", icon: Database },
+      { name: "Gateway PIX", href: "/gestaorevsystem/configuracoes/gateway", icon: CreditCard },
     ]
   },
 ]
@@ -58,14 +58,14 @@ export default function AdminLayout({
   const router = useRouter()
 
   // If on login page, render without sidebar
-  if (pathname === "/paineladminseven/login") {
+  if (pathname === "/gestaorevsystem/login") {
     return <>{children}</>
   }
 
   const handleLogout = () => {
     localStorage.removeItem("admin_session")
     fetch("/api/admin/auth", { method: "DELETE" })
-    router.push("/paineladminseven/login")
+    router.push("/gestaorevsystem/login")
   }
 
   return (
@@ -76,7 +76,7 @@ export default function AdminLayout({
         <div className="flex h-full flex-col">
           {/* Logo */}
           <div className="flex h-16 items-center border-b border-border px-6">
-            <Link href="/paineladminseven" className="flex items-center gap-2">
+            <Link href="/gestaorevsystem" className="flex items-center gap-2">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-secondary text-sm font-bold">
                 R
               </div>
@@ -88,7 +88,7 @@ export default function AdminLayout({
           <nav className="flex-1 space-y-1 overflow-y-auto p-4">
             {sidebarItems.map((item) => {
               const isActive = pathname === item.href || 
-                (item.href !== "/paineladminseven" && pathname.startsWith(item.href))
+                (item.href !== "/gestaorevsystem" && pathname.startsWith(item.href))
               const hasSubItems = item.subItems && item.subItems.length > 0
               
               return (

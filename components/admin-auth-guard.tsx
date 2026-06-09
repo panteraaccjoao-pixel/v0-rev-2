@@ -12,7 +12,7 @@ export function AdminAuthGuard({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Skip auth check for login page
-    if (pathname === "/paineladminseven/login") {
+    if (pathname === "/gestaorevsystem/login") {
       setIsLoading(false)
       setIsAuthenticated(true)
       return
@@ -27,14 +27,14 @@ export function AdminAuthGuard({ children }: { children: React.ReactNode }) {
       if (cancelled) return
       setIsAuthenticated(false)
       setIsLoading(false)
-      router.replace("/paineladminseven/login")
+      router.replace("/gestaorevsystem/login")
       // Fallback: ensure navigation completes even if soft routing is blocked (e.g. preview iframe)
       setTimeout(() => {
         if (
-          window.location.pathname.startsWith("/paineladminseven") &&
-          window.location.pathname !== "/paineladminseven/login"
+          window.location.pathname.startsWith("/gestaorevsystem") &&
+          window.location.pathname !== "/gestaorevsystem/login"
         ) {
-          window.location.href = "/paineladminseven/login"
+          window.location.href = "/gestaorevsystem/login"
         }
       }, 400)
     }
@@ -90,7 +90,7 @@ export function AdminAuthGuard({ children }: { children: React.ReactNode }) {
     )
   }
 
-  if (!isAuthenticated && pathname !== "/paineladminseven/login") {
+  if (!isAuthenticated && pathname !== "/gestaorevsystem/login") {
     return null
   }
 
