@@ -32,11 +32,46 @@ interface Purchase {
   status: string
 }
 
+// --- Vendas simuladas (prova social) ---
+// Populam o feed de "Vendas recentes" e continuam surgindo em tempo real,
+// junto com as vendas reais quando elas existirem.
+const FAKE_USERS = [
+  "lucas.r", "mariana_", "pedrohsa", "ana.clara", "joao_vfs", "carol.m",
+  "rafa_oliv", "bruno.tk", "gabriela", "thiago_p", "felipe.nz", "leticia_",
+  "vinicius", "amanda.s", "matheus_", "isadora", "gustavo.h", "larissa",
+  "rodrigo_", "beatriz.c", "diego.fs", "natalia_", "henrique", "juliana.m",
+]
+const FAKE_PRODUCTS = [
+  "Platinum visa", "Gold mastercard", "Black visa", "Standard visa",
+  "Platinum mastercard", "Infinite visa", "Gold visa", "Business mastercard",
+]
+const FAKE_VALUES = [25, 30, 35, 40, 45, 50, 60, 70, 80, 90, 100, 120]
+
+function pick<T>(arr: T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)]
+}
+
+function makeFakeSale(secondsAgo: number): RecentSale {
+  return {
+    id: `fake_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    user: pick(FAKE_USERS),
+    product: pick(FAKE_PRODUCTS),
+    value: pick(FAKE_VALUES),
+    date: new Date(Date.now() - secondsAgo * 1000).toISOString(),
+  }
+}
+
+// Lista inicial: algumas vendas já populadas com horários escalonados.
+function makeInitialFakeSales(): RecentSale[] {
+  const offsets = [8, 45, 130, 320, 540, 900, 1500]
+  return offsets.map((s) => makeFakeSale(s))
+}
+
 export default function DashboardPage() {
   const [bannerDismissed, setBannerDismissed] = useState(false)
   const [discordLinked, setDiscordLinked] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
-  const [recentSales, setRecentSales] = useState<RecentSale[]>([])
+  const [recentSales, setRecentSales] = useState<RecentSale[]>(() => makeInitialFakeSales())
   const [userBalance, setUserBalance] = useState(0)
   const [purchases, setPurchases] = useState<Purchase[]>([])
   const [stats, setStats] = useState({ compras: 0, totalGasto: 0, ticketMedio: 0 })
@@ -60,7 +95,14 @@ export default function DashboardPage() {
       const res = await fetch("/api/admin/stats")
       if (res.ok) {
         const data = await res.json()
-        setRecentSales(data.recentSales || [])
+        const realSales: RecentSale[] = data.recentSales || []
+        if (realSales.length > 0) {
+          // Mescla vendas reais (no topo) com as simuladas, evitando duplicar.
+          setRecentSales((prev) => {
+            const fakes = prev.filter((s) => s.id.startsWith("fake_"))
+            return [...realSales, ...fakes].slice(0, 12)
+          })
+        }
       }
     } catch (error) {
       console.error("Error fetching recent sales:", error)
@@ -127,6 +169,23 @@ export default function DashboardPage() {
 
     return () => clearInterval(interval)
   }, [fetchRecentSales, fetchBalance, fetchDiscordStatus, fetchOrders])
+
+  // Mantém o feed "vivo": injeta uma nova venda simulada a cada 6-15s,
+  // no topo da lista, preservando as vendas reais existentes.
+  useEffect(() => {
+    let timeoutId: ReturnType<typeof setTimeout>
+
+    const scheduleNext = () => {
+      const delay = 6000 + Math.random() * 9000
+      timeoutId = setTimeout(() => {
+        setRecentSales((prev) => [makeFakeSale(0), ...prev].slice(0, 12))
+        scheduleNext()
+      }, delay)
+    }
+
+    scheduleNext()
+    return () => clearTimeout(timeoutId)
+  }, [])
 
   // Mask username for privacy
   const maskUsername = (username: string) => {
