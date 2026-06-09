@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getInternalSecret } from "@/lib/repositories/admin-session"
-import { isAuthenticatedAdmin, unauthorizedResponse } from "@/lib/admin-auth"
+import { isAuthenticatedAdmin, isInternalRequest, unauthorizedResponse } from "@/lib/admin-auth"
 import { requireUser } from "@/lib/user-auth"
 
 // In-memory storage for recharges (replace with database in production)
@@ -24,10 +24,11 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const status = searchParams.get("status")
   const isAdmin = isAuthenticatedAdmin(request)
+  const isInternal = isInternalRequest(request)
 
   let filteredRecharges = [...recharges]
 
-  if (!isAdmin) {
+  if (!isAdmin && !isInternal) {
     const session = requireUser(request)
     if (!session) return unauthorizedResponse()
     filteredRecharges = filteredRecharges.filter(r => r.userId === session.uid)

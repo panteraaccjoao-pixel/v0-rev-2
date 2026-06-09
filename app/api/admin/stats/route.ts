@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server"
 import { getDbConfigRaw } from "@/app/api/admin/config/route"
+import { isAuthenticatedAdmin, isInternalRequest, unauthorizedResponse } from "@/lib/admin-auth"
+import { getInternalSecret } from "@/lib/repositories/admin-session"
 
 // In-memory store for demo (use your database in production)
 let statsData = {
@@ -15,7 +17,9 @@ let statsData = {
   lastUpdated: new Date().toISOString()
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  // Faturamento, vendas e dados financeiros são restritos ao admin.
+  if (!isAuthenticatedAdmin(request)) return unauthorizedResponse()
   try {
     // In production, fetch from your database using the stored config
     const dbConfig = await getDbConfigRaw()
@@ -25,12 +29,13 @@ export async function GET() {
       // const data = await fetchFromDatabase(dbConfig)
     }
 
-    // Fetch real-time data from other APIs
+    // Fetch real-time data from other APIs (chamadas internas autenticadas)
     try {
+      const internalHeaders = { "x-internal-secret": getInternalSecret() }
       const [usersRes, rechargesRes, estoqueRes] = await Promise.all([
-        fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/users`),
-        fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/recargas`),
-        fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/estoque`)
+        fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/users`, { headers: internalHeaders }),
+        fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/recargas`, { headers: internalHeaders }),
+        fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/estoque`, { headers: internalHeaders })
       ])
 
       if (usersRes.ok) {
@@ -64,6 +69,10 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  // Alterar faturamento/vendas exige admin OU chamada interna (webhook).
+  if (!isAuthenticatedAdmin(request) && !isInternalRequest(request)) {
+    return unauthorizedResponse()
+  }
   try {
     const { action, data } = await request.json()
     

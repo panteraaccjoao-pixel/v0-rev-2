@@ -1,12 +1,45 @@
 import { NextResponse } from "next/server"
+import { timingSafeEqual } from "crypto"
 import { findPixPayment } from "@/lib/repositories/pix"
 import { confirmPayment } from "@/app/api/pix/route"
+import { getInternalSecret } from "@/lib/repositories/admin-session"
 
 // This webhook receives payment notifications from your gateway
 // Configure this URL in your gateway's webhook settings
 
+// Valida o segredo do webhook. A gateway precisa enviar o segredo via header
+// `x-webhook-secret` OU via query string `?secret=...` (configurado na URL do
+// webhook no painel da gateway). Sem isso, QUALQUER pessoa poderia falsificar
+// uma confirmação de pagamento e receber os cartões sem pagar.
+// Fail-closed: se WEBHOOK_SECRET não estiver definido, recusa tudo.
+function isValidWebhookSecret(request: Request): boolean {
+  const expected = process.env.WEBHOOK_SECRET
+  if (!expected) {
+    console.error("[Webhook] WEBHOOK_SECRET não configurado — recusando por segurança.")
+    return false
+  }
+  const url = new URL(request.url)
+  const provided =
+    request.headers.get("x-webhook-secret") ||
+    url.searchParams.get("secret") ||
+    ""
+  const a = Buffer.from(provided)
+  const b = Buffer.from(expected)
+  if (a.length !== b.length) return false
+  try {
+    return timingSafeEqual(a, b)
+  } catch {
+    return false
+  }
+}
+
 export async function POST(request: Request) {
   try {
+    // Bloqueia qualquer chamada que não comprove o segredo do webhook.
+    if (!isValidWebhookSecret(request)) {
+      return NextResponse.json({ error: "Não autorizado" }, { status: 401 })
+    }
+
     const payload = await request.json()
     
     console.log("[Webhook] Payment notification received:", JSON.stringify(payload, null, 2))
@@ -121,7 +154,10 @@ export async function POST(request: Request) {
           
         await fetch(`${baseUrl}/api/admin/stats`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "x-internal-secret": getInternalSecret(),
+          },
           body: JSON.stringify({
             action: "add_sale",
             data: {
