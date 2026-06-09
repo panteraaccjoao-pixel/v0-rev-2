@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { getUserByEmail, setBalance } from "@/lib/repositories/users"
+import { requireUser, unauthorizedResponse } from "@/lib/user-auth"
 
 function getStore() {
   if (!global.giftsStore) {
@@ -14,11 +15,15 @@ function getStore() {
 // Resgata um gift pelo código e credita o saldo no perfil do usuário
 export async function POST(request: Request) {
   try {
-    const { code, email } = await request.json()
+    // Identidade vem da sessão assinada — NUNCA do corpo da requisição.
+    const session = requireUser(request)
+    if (!session) return unauthorizedResponse()
 
-    if (!code || !email) {
+    const { code } = await request.json()
+
+    if (!code) {
       return NextResponse.json(
-        { success: false, message: "Código e email são obrigatórios" },
+        { success: false, message: "Código é obrigatório" },
         { status: 400 }
       )
     }
@@ -42,7 +47,7 @@ export async function POST(request: Request) {
       )
     }
 
-    const profile = await getUserByEmail(email)
+    const profile = await getUserByEmail(session.email)
     if (!profile) {
       return NextResponse.json(
         { success: false, message: "Usuário não encontrado" },

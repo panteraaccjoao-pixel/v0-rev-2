@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { getSupabaseAdmin } from "@/lib/repositories/supabase-client"
 import { isSupabaseEnabled } from "@/lib/repositories/backend"
+import { requireUser, unauthorizedResponse } from "@/lib/user-auth"
 
 export const runtime = "nodejs"
 
@@ -10,6 +11,10 @@ const ALLOWED = ["image/jpeg", "image/png", "image/webp", "image/gif"]
 
 export async function POST(request: Request) {
   try {
+    // Exige sessão válida — evita abuso do storage por anônimos.
+    const session = requireUser(request)
+    if (!session) return unauthorizedResponse()
+
     if (!isSupabaseEnabled()) {
       return NextResponse.json(
         { error: "Upload de imagens indisponível: Supabase não configurado." },

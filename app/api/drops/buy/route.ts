@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { requireUser, unauthorizedResponse } from "@/lib/user-auth"
 
 declare global {
   var dropsStore: {
@@ -29,6 +30,10 @@ function getStore() {
 
 export async function POST(request: Request) {
   try {
+    // Exige sessão válida — compra de drop é ação autenticada.
+    const session = requireUser(request)
+    if (!session) return unauthorizedResponse()
+
     const body = await request.json()
     const { dropId } = body
 
