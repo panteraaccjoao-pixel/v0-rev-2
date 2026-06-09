@@ -38,7 +38,7 @@ export default function AdminLoginPage() {
           expiresAt: Date.now() + (24 * 60 * 60 * 1000) // 24 hours
         }))
         // Hard navigation ensures it works even inside the preview iframe
-        window.location.href = "/paineladminseven"
+        window.location.href = "/gestaorevsystem"
         return
       } else {
         setError(data.message || "Credenciais inválidas")

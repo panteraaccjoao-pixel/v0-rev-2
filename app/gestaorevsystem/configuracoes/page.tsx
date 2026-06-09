@@ -12,7 +12,7 @@ const configSections = [
   {
     title: "Banco de Dados",
     description: "Configure a conexao com seu banco de dados (PostgreSQL, MySQL, MongoDB)",
-    href: "/paineladminseven/configuracoes/banco-de-dados",
+    href: "/gestaorevsystem/configuracoes/banco-de-dados",
     icon: Database,
     color: "text-blue-500",
     bgColor: "bg-blue-500/10",
@@ -20,7 +20,7 @@ const configSections = [
   {
     title: "Gateway PIX",
     description: "Configure sua gateway de pagamento para receber via PIX",
-    href: "/paineladminseven/configuracoes/gateway",
+    href: "/gestaorevsystem/configuracoes/gateway",
     icon: CreditCard,
     color: "text-green-500",
     bgColor: "bg-green-500/10",
@@ -28,7 +28,7 @@ const configSections = [
   {
     title: "Captcha",
     description: "Configure as chaves pública e secreta do serviço de captcha (reCAPTCHA, hCaptcha, Turnstile)",
-    href: "/paineladminseven/configuracoes/captcha",
+    href: "/gestaorevsystem/configuracoes/captcha",
     icon: ShieldCheck,
     color: "text-amber-500",
     bgColor: "bg-amber-500/10",
@@ -36,7 +36,7 @@ const configSections = [
   {
     title: "Senha do Admin",
     description: "Altere a senha de acesso ao painel administrativo",
-    href: "/paineladminseven/configuracoes/senha",
+    href: "/gestaorevsystem/configuracoes/senha",
     icon: KeyRound,
     color: "text-red-500",
     bgColor: "bg-red-500/10",

@@ -10,34 +10,9 @@ import {
   findPixPayment,
   updatePixPayment,
 } from "@/lib/repositories/pix"
-import { addStock } from "@/lib/repositories/stock"
-import type { PixPayment } from "@/lib/repositories/types"
+import { findMatchingStock, removeStockById } from "@/lib/repositories/stock"
+import type { PixPayment, Product } from "@/lib/repositories/types"
 import { fulfillDelivery, type DeliveredCard } from "@/lib/fulfillment"
-
-// Devolve ao estoque os cartões que foram reservados (removidos) durante um
-// checkout PIX que NÃO foi pago (expirou ou foi cancelado). Sem isso, cada PIX
-// não pago drena o estoque permanentemente — um atacante poderia esvaziar o
-// catálogo gerando checkouts e nunca pagando.
-// Idempotente: a flag `restored` garante que os cartões só voltem uma vez.
-export async function restoreReservedCards(payment: PixPayment): Promise<void> {
-  if (payment.purpose !== "purchase") return
-  if (payment.delivered) return // já entregue ao cliente — não devolver
-  if (payment.restored) return // já devolvido
-  if (!Array.isArray(payment.reservedCards) || payment.reservedCards.length === 0) return
-
-  // Marca como restaurado ANTES de recolocar, de forma condicional (false->true).
-  // Se outra execução concorrente já marcou, abortamos para não duplicar.
-  const marked = await updatePixPayment(payment.id, { restored: true })
-  if (!marked || marked.restored !== true) return
-
-  for (const card of payment.reservedCards) {
-    try {
-      await addStock(card)
-    } catch (err) {
-      console.error("[PIX] Falha ao devolver cartão ao estoque:", card.id, err)
-    }
-  }
-}
 
 // Confirma um pagamento: credita saldo (recarga) ou entrega cartões (compra).
 // Idempotente e seguro para ser chamado por PATCH e pelo webhook da gateway.
@@ -57,10 +32,14 @@ export async function confirmPayment(payment: PixPayment): Promise<DeliveredCard
 }
 
 // Entrega os cartões de uma compra paga (idempotente).
+// Como os cartões NÃO são reservados no checkout, a baixa do estoque acontece
+// aqui, no momento da confirmação do pagamento. Para cada cartão selecionado,
+// tentamos removê-lo do estoque; se já tiver sido vendido nesse intervalo,
+// buscamos um substituto equivalente (mesmo nível/bandeira).
 async function deliverPurchase(payment: PixPayment): Promise<DeliveredCard[]> {
   if (payment.purpose !== "purchase") return []
   if (payment.delivered) {
-    // Já entregue: reconstrói a view a partir dos cartões reservados.
+    // Já entregue: reconstrói a view a partir dos cartões já vendidos.
     return payment.reservedCards.map((c) => ({
       id: c.id,
       fullCard: c.fullCard,
@@ -77,13 +56,31 @@ async function deliverPurchase(payment: PixPayment): Promise<DeliveredCard[]> {
     }))
   }
 
+  // Baixa o estoque agora (pagamento aprovado).
+  const soldCards: Product[] = []
+  const usedIds = new Set<string>()
+  for (const card of payment.reservedCards) {
+    let removed = await removeStockById(card.id)
+    // Cartão original já vendido? Tenta um substituto equivalente.
+    if (!removed) {
+      const matching = await findMatchingStock(card.level, card.brand)
+      const candidate = matching.find((p) => !usedIds.has(p.id))
+      if (candidate) removed = await removeStockById(candidate.id)
+    }
+    if (removed) {
+      soldCards.push(removed)
+      usedIds.add(removed.id)
+    }
+  }
+
+  // Persiste os cartões efetivamente vendidos (para reconstruir a entrega depois).
   const delivered = await fulfillDelivery({
-    cards: payment.reservedCards,
+    cards: soldCards,
     userEmail: payment.userEmail,
     userId: payment.userId,
     userName: payment.userName,
   })
-  await updatePixPayment(payment.id, { delivered: true })
+  await updatePixPayment(payment.id, { delivered: true, reservedCards: soldCards })
   return delivered
 }
 
@@ -174,8 +171,7 @@ export async function GET(request: NextRequest) {
     if (payment.status === "pending" && new Date() > payment.expiresAt) {
       await updatePixPayment(payment.id, { status: "expired" })
       payment.status = "expired"
-      // Compra expirada sem pagamento: devolve os cartões reservados ao estoque.
-      await restoreReservedCards(payment)
+      // Nada a devolver: o estoque só é debitado na confirmação do pagamento.
     }
 
     const response: {
@@ -236,8 +232,7 @@ export async function PATCH(request: NextRequest) {
 
     if (action === "cancel") {
       await updatePixPayment(payment.id, { status: "expired" })
-      // Compra cancelada: devolve os cartões reservados ao estoque.
-      await restoreReservedCards(payment)
+      // Nada a devolver: o estoque só é debitado na confirmação do pagamento.
       return NextResponse.json({ success: true, status: "expired" })
     }
 

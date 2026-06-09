@@ -206,10 +206,31 @@ export default function CheckoutPage() {
         }),
       })
 
+      // A resposta pode não ser JSON (ex.: a Cloudflare devolve uma página HTML
+      // de desafio/bloqueio quando o WAF intercepta a rota). Nesse caso o
+      // res.json() lançaria e cairíamos no catch genérico — então detectamos
+      // isso aqui para mostrar uma mensagem mais clara.
+      const contentType = res.headers.get("content-type") || ""
+      if (!contentType.includes("application/json")) {
+        if (res.status === 429) {
+          alert("Muitas tentativas em pouco tempo. Aguarde um minuto e tente novamente.")
+        } else {
+          alert(
+            "Não foi possível concluir o pagamento (a requisição foi bloqueada por uma camada de proteção). Tente novamente em instantes.",
+          )
+        }
+        setProcessing(false)
+        return
+      }
+
       const data = await res.json()
 
       if (!res.ok || !data.success) {
-        alert(data.error || "Erro ao finalizar compra")
+        if (res.status === 429) {
+          alert("Muitas tentativas em pouco tempo. Aguarde um minuto e tente novamente.")
+        } else {
+          alert(data.error || "Erro ao finalizar compra")
+        }
         setProcessing(false)
         return
       }
