@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { listReviews, addReview, markReviewHelpful } from "@/lib/repositories/reviews"
+import { requireUser, unauthorizedResponse } from "@/lib/user-auth"
 
 export async function GET(request: NextRequest) {
   try {
@@ -18,10 +19,13 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { username, rating, comment, productType, price, imageUrl } = body
+    const session = requireUser(request)
+    if (!session) return unauthorizedResponse()
 
-    if (!username || !rating || !comment || !productType) {
+    const body = await request.json()
+    const { rating, comment, productType, price, imageUrl } = body
+
+    if (!rating || !comment || !productType) {
       return NextResponse.json({ error: "Campos obrigatórios faltando" }, { status: 400 })
     }
 
@@ -30,7 +34,8 @@ export async function POST(request: NextRequest) {
     }
 
     const review = await addReview({
-      username,
+      // Autor vem da sessão — ninguém posta avaliação em nome de outro.
+      username: session.name || session.email,
       rating,
       comment,
       productType,
@@ -47,6 +52,9 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
+    const session = requireUser(request)
+    if (!session) return unauthorizedResponse()
+
     const body = await request.json()
     const { reviewId } = body
 

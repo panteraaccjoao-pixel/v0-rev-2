@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Slider } from "@/components/ui/slider"
 import Link from "next/link"
 import Image from "next/image"
+import { authFetch } from "@/lib/session"
 
 const predefinedValues = [
   { value: 10, label: "R$ 10" },
@@ -145,7 +146,7 @@ export default function RecarregarPage() {
     setError(null)
 
     try {
-      const res = await fetch("/api/pix", {
+      const res = await authFetch("/api/pix", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

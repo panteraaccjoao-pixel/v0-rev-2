@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { User, Shield, Palette, LogOut, MessageCircle, Check, X, Loader2, ExternalLink } from "lucide-react"
-import { getSessionEmail, setSessionProfile } from "@/lib/session"
+import { setSessionProfile, authFetch } from "@/lib/session"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -52,10 +52,9 @@ export default function ConfiguracoesPage() {
   }, [])
 
   const fetchProfile = async () => {
-    const sessionEmail = getSessionEmail()
-    if (!sessionEmail) return
     try {
-      const res = await fetch(`/api/user/profile?email=${encodeURIComponent(sessionEmail)}`)
+      // Identidade vem da sessão (cookie/token) — não enviamos e-mail.
+      const res = await authFetch("/api/user/profile")
       if (res.ok) {
         const data = await res.json()
         setName(data.name || "")
@@ -75,18 +74,13 @@ export default function ConfiguracoesPage() {
       return
     }
 
-    const currentEmail = getSessionEmail()
-    if (!currentEmail) {
-      setProfileError("Sessão não encontrada. Faça login novamente.")
-      return
-    }
-
     setProfileLoading(true)
     try {
-      const res = await fetch("/api/user/profile", {
+      // O servidor identifica o usuário pela sessão; só enviamos os novos dados.
+      const res = await authFetch("/api/user/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ currentEmail, name: name.trim(), email: email.trim() }),
+        body: JSON.stringify({ name: name.trim(), email: email.trim() }),
       })
 
       const data = await res.json()
@@ -123,7 +117,7 @@ export default function ConfiguracoesPage() {
 
   const fetchDiscordStatus = async () => {
     try {
-      const res = await fetch("/api/user/discord")
+      const res = await authFetch("/api/user/discord")
       if (res.ok) {
         const data = await res.json()
         setDiscordData(data)
@@ -136,7 +130,7 @@ export default function ConfiguracoesPage() {
   const handleDiscordCallback = async (discordId: string, discordUsername: string) => {
     setIsLinkingDiscord(true)
     try {
-      const res = await fetch("/api/user/discord", {
+      const res = await authFetch("/api/user/discord", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ discordId, discordUsername })
@@ -186,7 +180,7 @@ export default function ConfiguracoesPage() {
     setDiscordSuccess("")
 
     try {
-      const res = await fetch("/api/user/discord", {
+      const res = await authFetch("/api/user/discord", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ discordId: discordId.trim() })
@@ -220,7 +214,7 @@ export default function ConfiguracoesPage() {
     setDiscordError("")
 
     try {
-      const res = await fetch("/api/user/discord", { method: "DELETE" })
+      const res = await authFetch("/api/user/discord", { method: "DELETE" })
 
       if (!res.ok) {
         const data = await res.json()

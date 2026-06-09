@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getInternalSecret } from "@/lib/repositories/admin-session"
+import { requireUser, unauthorizedResponse } from "@/lib/user-auth"
 
 // In-memory storage for user discord links (replace with database in production)
 const userDiscordLinks: Map<string, { discordId: string; discordUsername: string; linkedAt: string }> = new Map()
 
 export async function GET(request: NextRequest) {
-  const userId = request.headers.get("x-user-id") || "anonymous"
+  const session = requireUser(request)
+  if (!session) return unauthorizedResponse()
+  const userId = session.uid
   
   const discordData = userDiscordLinks.get(userId)
   
@@ -23,9 +26,12 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const session = requireUser(request)
+    if (!session) return unauthorizedResponse()
+    const userId = session.uid
+
     const body = await request.json()
     const { discordId } = body
-    const userId = request.headers.get("x-user-id") || "anonymous"
     
     if (!discordId || discordId.trim() === "") {
       return NextResponse.json(
@@ -59,7 +65,7 @@ export async function POST(request: NextRequest) {
         },
         body: JSON.stringify({ 
           action: "set_discord", 
-          email: "teste@teste.com", // Default user for now
+          email: session.email,
           discordId: discordId.trim()
         })
       })
@@ -82,7 +88,9 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const userId = request.headers.get("x-user-id") || "anonymous"
+  const session = requireUser(request)
+  if (!session) return unauthorizedResponse()
+  const userId = session.uid
   
   if (!userDiscordLinks.has(userId)) {
     return NextResponse.json(

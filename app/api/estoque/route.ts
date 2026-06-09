@@ -9,8 +9,59 @@ import {
 import type { Product } from "@/lib/repositories/types"
 import { createOrder } from "@/lib/repositories/orders"
 import { getUserByEmail, setBalance, recordPurchase } from "@/lib/repositories/users"
+import { isAuthenticatedAdmin, unauthorizedResponse } from "@/lib/admin-auth"
+import { requireUser } from "@/lib/user-auth"
 
-// GET - List all products
+// Monta a visão pública (mascarada) de um grupo de produtos. NUNCA inclui
+// dados sensíveis (número completo, CVV, CPF, nome/validade completos).
+// Esses campos só saem do backend após uma compra paga/validada.
+function buildGrouped(products: Product[]) {
+  const grouped = products.reduce(
+    (acc, product) => {
+      const key = `${product.bin}-${product.level}-${product.brand}`
+      if (!acc[key]) {
+        acc[key] = {
+          level: product.level,
+          brand: product.brand,
+          price: product.price,
+          count: 0,
+          products: [] as { id: string }[],
+          bin: product.bin,
+          bank: product.bank,
+          // Dados sensíveis NÃO são enviados ao cliente. O front exibe
+          // placeholders mascarados a partir desses campos vazios.
+          holderName: "",
+          expiry: "",
+          hasHolderData: !!(product.holderName || product.cpf || product.birthDate),
+        }
+      }
+      acc[key].count++
+      acc[key].products.push({ id: product.id })
+      return acc
+    },
+    {} as Record<
+      string,
+      {
+        level: string
+        brand: string
+        price: number
+        count: number
+        products: { id: string }[]
+        bin: string
+        bank: string
+        holderName: string
+        expiry: string
+        hasHolderData: boolean
+      }
+    >,
+  )
+  return Object.values(grouped)
+}
+
+// GET - Lista o estoque.
+// - Admin autenticado: recebe os produtos completos (para gerenciamento).
+// - Usuário comum: recebe APENAS a visão agrupada e mascarada (sem dados
+//   sensíveis), além da contagem disponível.
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const level = searchParams.get("level")
@@ -37,54 +88,27 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  // Group products by BIN, level and brand for client view
-  const grouped = filteredProducts.reduce(
-    (acc, product) => {
-      const key = `${product.bin}-${product.level}-${product.brand}`
-      if (!acc[key]) {
-        acc[key] = {
-          level: product.level,
-          brand: product.brand,
-          price: product.price,
-          count: 0,
-          products: [] as { id: string }[],
-          bin: product.bin,
-          bank: product.bank,
-          holderName: product.holderName,
-          expiry: product.expiry,
-          hasHolderData: !!(product.holderName || product.cpf || product.birthDate),
-        }
-      }
-      acc[key].count++
-      acc[key].products.push({ id: product.id })
-      return acc
-    },
-    {} as Record<
-      string,
-      {
-        level: string
-        brand: string
-        price: number
-        count: number
-        products: { id: string }[]
-        bin: string
-        bank: string
-        holderName: string
-        expiry: string
-        hasHolderData: boolean
-      }
-    >,
-  )
+  const grouped = buildGrouped(filteredProducts)
 
+  // Apenas o admin autenticado enxerga os dados completos dos cartões.
+  if (isAuthenticatedAdmin(request)) {
+    return NextResponse.json({
+      products: filteredProducts,
+      grouped,
+      total: filteredProducts.length,
+    })
+  }
+
+  // Usuário comum: nada de dados sensíveis.
   return NextResponse.json({
-    products: filteredProducts,
-    grouped: Object.values(grouped),
+    grouped,
     total: filteredProducts.length,
   })
 }
 
-// POST - Add new product
+// POST - Adiciona produto ao estoque (somente admin).
 export async function POST(request: NextRequest) {
+  if (!isAuthenticatedAdmin(request)) return unauthorizedResponse()
   try {
     const data = await request.json()
     const newProduct = await addStock(data)
@@ -95,8 +119,9 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// DELETE - Remove product
+// DELETE - Remove produto do estoque (somente admin).
 export async function DELETE(request: NextRequest) {
+  if (!isAuthenticatedAdmin(request)) return unauthorizedResponse()
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get("id")
@@ -117,8 +142,9 @@ export async function DELETE(request: NextRequest) {
   }
 }
 
-// PUT - Update product
+// PUT - Atualiza produto do estoque (somente admin).
 export async function PUT(request: NextRequest) {
+  if (!isAuthenticatedAdmin(request)) return unauthorizedResponse()
   try {
     const data = await request.json()
 
@@ -138,15 +164,28 @@ export async function PUT(request: NextRequest) {
   }
 }
 
-// PATCH - Purchase a single product directly (compra unitária paga com saldo).
-// O fluxo principal de compra é /api/checkout. Mantido para compras avulsas.
+// PATCH - Compra avulsa de um cartão, paga com saldo.
+// Exige um usuário válido (e-mail com perfil) e saldo suficiente. Não há mais
+// entrega "de graça" para chamadas sem usuário — isso impede compras fantasma
+// e o consumo indevido do estoque.
 export async function PATCH(request: NextRequest) {
   try {
+    // Identidade vem da sessão assinada — nunca do corpo da requisição.
+    const session = requireUser(request)
+    if (!session) {
+      return NextResponse.json({ error: "Faça login para comprar" }, { status: 401 })
+    }
+
     const body = await request.json()
-    const { id, action, userId, userName, userEmail } = body
+    const { id, action } = body
 
     if (action !== "purchase") {
       return NextResponse.json({ error: "Ação inválida" }, { status: 400 })
+    }
+
+    const profile = await getUserByEmail(session.email.toLowerCase())
+    if (!profile) {
+      return NextResponse.json({ error: "Usuário não encontrado. Faça login novamente." }, { status: 401 })
     }
 
     const product = await findStockById(id)
@@ -154,32 +193,29 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Produto não encontrado ou já vendido" }, { status: 404 })
     }
 
-    // Paga com saldo se houver perfil e saldo suficiente.
-    const profile = userEmail ? await getUserByEmail(userEmail) : null
-    let newBalance: number | undefined
-    if (profile) {
-      const balance = Number(profile.balance ?? 0)
-      if (balance < Number(product.price ?? 0)) {
-        return NextResponse.json(
-          { error: "Saldo insuficiente", needsRecharge: true },
-          { status: 402 },
-        )
-      }
-      newBalance = balance - Number(product.price ?? 0)
-      await setBalance(profile.id, newBalance)
-      await recordPurchase(profile.id, Number(product.price ?? 0))
+    // Valida saldo no backend.
+    const balance = Number(profile.balance ?? 0)
+    const price = Number(product.price ?? 0)
+    if (balance < price) {
+      return NextResponse.json({ error: "Saldo insuficiente", needsRecharge: true }, { status: 402 })
     }
 
-    // Baixa o estoque.
+    // Baixa o estoque de forma atômica ANTES de cobrar, garantindo que o cartão
+    // não seja vendido duas vezes.
     const removed = await removeStockById(id)
     if (!removed) {
       return NextResponse.json({ error: "Produto não encontrado ou já vendido" }, { status: 404 })
     }
 
-    // Cria o pedido.
+    // Cobra do saldo e registra a compra.
+    const newBalance = balance - price
+    await setBalance(profile.id, newBalance)
+    await recordPurchase(profile.id, price)
+
+    // Cria o pedido associado ao usuário real.
     await createOrder({
-      userId: userId || profile?.id || "user_teste_001",
-      userName: userName || profile?.name || "Cliente",
+      userId: profile.id,
+      userName: profile.name || "Cliente",
       product: `${removed.level} ${removed.brand}`,
       level: removed.level,
       brand: removed.brand,

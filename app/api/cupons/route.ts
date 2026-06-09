@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { isAuthenticatedAdmin, isInternalRequest, unauthorizedResponse } from "@/lib/admin-auth"
 import {
   listCupons,
   createCupom,
@@ -20,7 +21,9 @@ export async function useCouponServer(code: string): Promise<boolean> {
   return useCoupon(code)
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  // Lista completa de cupons + estatísticas é dado administrativo.
+  if (!isAuthenticatedAdmin(request)) return unauthorizedResponse()
   const cupons = await listCupons()
 
   const ativos = cupons.filter((c) => c.status === "ativo")
@@ -42,6 +45,13 @@ export async function POST(request: Request) {
   try {
     const body = await request.json()
     const { action, cupomId, ...data } = body
+
+    // Apenas a validação de cupom é pública (usada no checkout pelo cliente).
+    // Todas as demais ações são administrativas/internas.
+    const isPublicAction = action === "validate"
+    if (!isPublicAction && !isAuthenticatedAdmin(request) && !isInternalRequest(request)) {
+      return unauthorizedResponse()
+    }
 
     if (action === "create") {
       const existing = await findCupomByCode(data.code)
@@ -109,6 +119,7 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  if (!isAuthenticatedAdmin(request)) return unauthorizedResponse()
   const { searchParams } = new URL(request.url)
   const id = searchParams.get("id")
 

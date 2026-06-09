@@ -1,10 +1,21 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createUser, getUserByEmail } from "@/lib/repositories/users"
 import { sanitizeInput } from "@/lib/security"
+import { createUserToken, USER_SESSION_COOKIE, sessionCookieOptions } from "@/lib/user-session"
+import { verifyRecaptcha } from "@/lib/recaptcha"
 
 export async function POST(request: NextRequest) {
   try {
-    const { name, email, password } = await request.json()
+    const { name, email, password, captchaToken } = await request.json()
+
+    // Valida o captcha no servidor (a secret nunca sai daqui).
+    const captchaOk = await verifyRecaptcha(captchaToken)
+    if (!captchaOk) {
+      return NextResponse.json(
+        { success: false, message: "Falha na verificação do captcha. Tente novamente." },
+        { status: 400 }
+      )
+    }
 
     if (!name || !email || !password) {
       return NextResponse.json(
@@ -36,14 +47,25 @@ export async function POST(request: NextRequest) {
       password,
     })
 
-    return NextResponse.json({
+    const token = createUserToken({
+      id: profile.id,
+      email: profile.email,
+      name: profile.name,
+    })
+
+    const response = NextResponse.json({
       success: true,
+      token,
       user: {
         id: profile.id,
         name: profile.name,
         email: profile.email,
       },
     })
+
+    response.cookies.set(USER_SESSION_COOKIE, token, sessionCookieOptions())
+
+    return response
   } catch (error) {
     console.error("[Register] Error:", error)
     return NextResponse.json(

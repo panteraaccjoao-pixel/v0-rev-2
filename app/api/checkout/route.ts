@@ -8,6 +8,7 @@ import { addPixPayment } from "@/lib/repositories/pix"
 import type { Product, PixPayment } from "@/lib/repositories/types"
 import { validateCoupon, useCoupon, type CouponValidation } from "@/lib/repositories/cupons"
 import { fulfillDelivery } from "@/lib/fulfillment"
+import { requireUser, unauthorizedResponse } from "@/lib/user-auth"
 
 interface CheckoutItem {
   level: string
@@ -30,13 +31,19 @@ export async function POST(request: NextRequest) {
       return rateLimitResponse(rateLimit.resetIn)
     }
 
+    // Exige usuário autenticado. A identidade vem da sessão — nunca do corpo.
+    const session = requireUser(request)
+    if (!session) {
+      return unauthorizedResponse()
+    }
+    const userEmail = session.email.toLowerCase()
+    const userId = session.uid
+    const userName = session.name
+
     const body = await request.json()
-    const { items, couponCode, userEmail, userId, userName } = body as {
+    const { items, couponCode } = body as {
       items: CheckoutItem[]
       couponCode?: string
-      userEmail?: string
-      userId?: string
-      userName?: string
     }
 
     if (!Array.isArray(items) || items.length === 0) {

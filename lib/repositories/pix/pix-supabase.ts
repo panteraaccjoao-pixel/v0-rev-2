@@ -20,6 +20,7 @@ function rowToPix(row: any): PixPayment {
     purpose: (row.purpose ?? "recharge") as PixPayment["purpose"],
     credited: Boolean(row.credited),
     delivered: Boolean(row.delivered),
+    restored: Boolean(row.restored),
     reservedCards: (row.reserved_cards ?? []) as Product[],
     couponCode: row.coupon_code ?? undefined,
     items: (row.items ?? []) as PixPayment["items"],
@@ -41,6 +42,7 @@ function pixToRow(p: PixPayment): Record<string, any> {
     purpose: p.purpose,
     credited: p.credited ?? false,
     delivered: p.delivered ?? false,
+    restored: p.restored ?? false,
     reserved_cards: p.reservedCards ?? [],
     coupon_code: p.couponCode ?? null,
     items: p.items ?? [],
@@ -64,6 +66,7 @@ function patchToRow(patch: Partial<PixPayment>): Record<string, any> {
   if (patch.purpose !== undefined) row.purpose = patch.purpose
   if (patch.credited !== undefined) row.credited = patch.credited
   if (patch.delivered !== undefined) row.delivered = patch.delivered
+  if (patch.restored !== undefined) row.restored = patch.restored
   if (patch.reservedCards !== undefined) row.reserved_cards = patch.reservedCards
   if (patch.couponCode !== undefined) row.coupon_code = patch.couponCode
   if (patch.items !== undefined) row.items = patch.items
@@ -105,6 +108,7 @@ export async function updatePixPayment(
   let query = supabase.from(TABLE).update(row).eq("id", id)
   if (patch.credited === true) query = query.eq("credited", false)
   if (patch.delivered === true) query = query.eq("delivered", false)
+  if (patch.restored === true) query = query.eq("restored", false)
 
   const { data, error } = await query.select("*").maybeSingle()
   if (error) throw new Error(`updatePixPayment: ${error.message}`)

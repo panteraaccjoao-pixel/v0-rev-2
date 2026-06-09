@@ -6,6 +6,8 @@ import { ArrowLeft, Eye, EyeOff } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { saveSession } from "@/lib/session"
+import { Recaptcha } from "@/components/recaptcha"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -13,17 +15,24 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
+
+    if (!captchaToken) {
+      setError("Confirme que você não é um robô.")
+      return
+    }
+
     setLoading(true)
 
     try {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
+        body: JSON.stringify({ email: email.trim().toLowerCase(), password, captchaToken }),
       })
 
       const result = await res.json()
@@ -34,15 +43,12 @@ export default function LoginPage() {
       }
 
       const name = result.user?.name || result.user?.email || "Usuário"
-      localStorage.setItem(
-        "user_session",
-        JSON.stringify({
-          success: true,
-          userId: result.user?.id,
-          name,
-          email: result.user?.email,
-        })
-      )
+      saveSession({
+        userId: result.user?.id,
+        name,
+        email: result.user?.email,
+        token: result.token,
+      })
       // Hard navigation ensures it works even inside the preview iframe
       window.location.href = "/dashboard"
     } catch (err) {
@@ -131,6 +137,9 @@ export default function LoginPage() {
                 </button>
               </div>
             </div>
+
+            {/* reCAPTCHA */}
+            <Recaptcha onChange={setCaptchaToken} />
 
             {/* Submit button */}
             <Button 

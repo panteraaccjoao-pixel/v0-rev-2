@@ -4,13 +4,40 @@ import { rateLimitResponse } from "@/lib/security"
 import { createPix } from "@/lib/pix-gateway"
 import { addBalance } from "@/app/api/user/balance/route"
 import { isAuthenticatedAdmin, isInternalRequest, unauthorizedResponse } from "@/lib/admin-auth"
+import { requireUser } from "@/lib/user-auth"
 import {
   addPixPayment,
   findPixPayment,
   updatePixPayment,
 } from "@/lib/repositories/pix"
+import { addStock } from "@/lib/repositories/stock"
 import type { PixPayment } from "@/lib/repositories/types"
 import { fulfillDelivery, type DeliveredCard } from "@/lib/fulfillment"
+
+// Devolve ao estoque os cartões que foram reservados (removidos) durante um
+// checkout PIX que NÃO foi pago (expirou ou foi cancelado). Sem isso, cada PIX
+// não pago drena o estoque permanentemente — um atacante poderia esvaziar o
+// catálogo gerando checkouts e nunca pagando.
+// Idempotente: a flag `restored` garante que os cartões só voltem uma vez.
+export async function restoreReservedCards(payment: PixPayment): Promise<void> {
+  if (payment.purpose !== "purchase") return
+  if (payment.delivered) return // já entregue ao cliente — não devolver
+  if (payment.restored) return // já devolvido
+  if (!Array.isArray(payment.reservedCards) || payment.reservedCards.length === 0) return
+
+  // Marca como restaurado ANTES de recolocar, de forma condicional (false->true).
+  // Se outra execução concorrente já marcou, abortamos para não duplicar.
+  const marked = await updatePixPayment(payment.id, { restored: true })
+  if (!marked || marked.restored !== true) return
+
+  for (const card of payment.reservedCards) {
+    try {
+      await addStock(card)
+    } catch (err) {
+      console.error("[PIX] Falha ao devolver cartão ao estoque:", card.id, err)
+    }
+  }
+}
 
 // Confirma um pagamento: credita saldo (recarga) ou entrega cartões (compra).
 // Idempotente e seguro para ser chamado por PATCH e pelo webhook da gateway.
@@ -70,8 +97,16 @@ export async function POST(request: NextRequest) {
       return rateLimitResponse(rateLimit.resetIn)
     }
 
+    // Exige usuário autenticado. A recarga é creditada no PRÓPRIO usuário.
+    const session = requireUser(request)
+    if (!session) {
+      return unauthorizedResponse()
+    }
+    const userEmail = session.email.toLowerCase()
+    const userId = session.uid
+
     const data = await request.json()
-    const { amount, items, userId, userEmail } = data
+    const { amount, items } = data
 
     if (!amount || amount <= 0) {
       return NextResponse.json({ error: "Valor invalido" }, { status: 400 })
@@ -139,6 +174,8 @@ export async function GET(request: NextRequest) {
     if (payment.status === "pending" && new Date() > payment.expiresAt) {
       await updatePixPayment(payment.id, { status: "expired" })
       payment.status = "expired"
+      // Compra expirada sem pagamento: devolve os cartões reservados ao estoque.
+      await restoreReservedCards(payment)
     }
 
     const response: {
@@ -199,6 +236,8 @@ export async function PATCH(request: NextRequest) {
 
     if (action === "cancel") {
       await updatePixPayment(payment.id, { status: "expired" })
+      // Compra cancelada: devolve os cartões reservados ao estoque.
+      await restoreReservedCards(payment)
       return NextResponse.json({ success: true, status: "expired" })
     }
 

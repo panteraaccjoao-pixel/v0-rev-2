@@ -39,9 +39,9 @@ function mapProfile(p: Profile): UserView {
   }
 }
 
-// GET - lista todos os usuários (somente admin)
+// GET - lista todos os usuários (somente admin ou chamada interna)
 export async function GET(request: NextRequest) {
-  if (!isAuthenticatedAdmin(request)) {
+  if (!isAuthenticatedAdmin(request) && !isInternalRequest(request)) {
     return unauthorizedResponse()
   }
   try {

@@ -21,6 +21,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { saveSession, clearSession, getSessionToken } from "@/lib/session"
 
 const platformItems = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -70,23 +71,53 @@ export default function DashboardLayout({
       }, 400)
     }
 
-    const checkAuth = () => {
+    const checkAuth = async () => {
       try {
         const raw = localStorage.getItem("user_session")
         const session = raw ? JSON.parse(raw) : null
 
-        if (!active) return
-
-        if (!session?.success) {
+        if (!session?.success || !session?.email) {
           redirectToLogin()
           return
         }
 
-        const name = session.name || session.email || "Usuário"
-        setUser({ name, email: session.email || "" })
+        // Valida a sessão NO SERVIDOR. Isso revalida o usuário contra o banco
+        // e (re)emite o cookie httpOnly + token assinado. Uma sessão forjada no
+        // localStorage (ex.: {success:true}) é rejeitada aqui, pois o servidor
+        // só confirma usuários reais e ativos.
+        const res = await fetch("/api/auth/refresh", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(getSessionToken() ? { Authorization: `Bearer ${getSessionToken()}` } : {}),
+          },
+          credentials: "include",
+          body: JSON.stringify({ email: session.email }),
+        })
+
+        if (!active) return
+
+        if (!res.ok) {
+          clearSession()
+          redirectToLogin()
+          return
+        }
+
+        const result = await res.json()
+        const name = result.user?.name || result.user?.email || "Usuário"
+
+        // Atualiza a sessão local com os dados confirmados e o token novo.
+        saveSession({
+          userId: result.user?.id,
+          name,
+          email: result.user?.email,
+          token: result.token,
+        })
+
+        setUser({ name, email: result.user?.email || "" })
         setCheckingAuth(false)
       } catch {
-        redirectToLogin()
+        if (active) redirectToLogin()
       }
     }
 
@@ -107,10 +138,12 @@ export default function DashboardLayout({
     }
   }, [router])
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     try {
-      localStorage.removeItem("user_session")
+      // Invalida o cookie de sessão no servidor.
+      await fetch("/api/auth/login", { method: "DELETE", credentials: "include" })
     } catch {}
+    clearSession()
     window.location.href = "/login"
   }
 

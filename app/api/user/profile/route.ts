@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getUserByEmail, updateUser } from "@/lib/repositories/users"
+import { requireUser, unauthorizedResponse } from "@/lib/user-auth"
 
-// GET - retorna os dados do perfil (email via query param)
+// GET - retorna os dados do PRÓPRIO perfil autenticado.
 export async function GET(request: NextRequest) {
   try {
-    const email = request.nextUrl.searchParams.get("email")?.toLowerCase()
-
-    if (!email) {
-      return NextResponse.json({ error: "Email obrigatório" }, { status: 400 })
+    const session = requireUser(request)
+    if (!session) {
+      return unauthorizedResponse()
     }
 
-    const profile = await getUserByEmail(email)
+    const profile = await getUserByEmail(session.email.toLowerCase())
 
     if (!profile) {
       return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 })
@@ -26,16 +26,18 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// PATCH - atualiza nome e/ou email do usuário
+// PATCH - atualiza nome e/ou email do PRÓPRIO usuário autenticado.
 export async function PATCH(request: NextRequest) {
   try {
-    const { currentEmail, name, email } = await request.json()
-
-    if (!currentEmail) {
-      return NextResponse.json({ error: "Email atual obrigatório" }, { status: 400 })
+    const session = requireUser(request)
+    if (!session) {
+      return unauthorizedResponse()
     }
 
-    const profile = await getUserByEmail(String(currentEmail).toLowerCase())
+    const { name, email } = await request.json()
+
+    // Identidade vem da sessão — ignora qualquer currentEmail enviado pelo cliente.
+    const profile = await getUserByEmail(session.email.toLowerCase())
 
     if (!profile) {
       return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 })

@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import Link from "next/link"
 import Image from "next/image"
-import { getSession } from "@/lib/session"
+import { authFetch } from "@/lib/session"
 
 interface CartItem {
   id: string
@@ -191,20 +191,12 @@ export default function CheckoutPage() {
     setProcessing(true)
 
     try {
-      const session = getSession()
-      const sessionUserId = session?.userId || ""
-      const sessionEmail = session?.email || ""
-      const sessionName = session?.name || ""
-
       // O servidor decide: paga com saldo (entrega na hora) ou gera PIX.
-      // O total, o desconto e o estoque são validados no backend.
-      const res = await fetch("/api/checkout", {
+      // Identidade, total, desconto e estoque são validados no backend (sessão).
+      const res = await authFetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          userId: sessionUserId,
-          userEmail: sessionEmail,
-          userName: sessionName,
           couponCode: appliedCoupon?.code,
           items: cartItems.map((item) => ({
             level: item.level,

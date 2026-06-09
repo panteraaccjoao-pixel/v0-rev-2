@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { ArrowLeft, Zap, CreditCard, Users, Eye } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { authFetch } from "@/lib/session"
 
 interface Drop {
   id: string
@@ -56,7 +57,7 @@ export default function DropsPage() {
         return
       }
 
-      const res = await fetch("/api/drops/buy", {
+      const res = await authFetch("/api/drops/buy", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ dropId }),

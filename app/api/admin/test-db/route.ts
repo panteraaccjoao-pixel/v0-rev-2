@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
+import { isAuthenticatedAdmin, unauthorizedResponse } from "@/lib/admin-auth"
 
 export async function POST(request: Request) {
+  if (!isAuthenticatedAdmin(request)) return unauthorizedResponse()
   try {
     const dbConfig = await request.json()
     

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getInternalSecret } from "@/lib/repositories/admin-session"
-import { isAuthenticatedAdmin, unauthorizedResponse } from "@/lib/admin-auth"
+import { isAuthenticatedAdmin, isInternalRequest, unauthorizedResponse } from "@/lib/admin-auth"
+import { requireUser } from "@/lib/user-auth"
 
 // In-memory storage for recharges (replace with database in production)
 let recharges: Recharge[] = []
@@ -18,20 +19,23 @@ interface Recharge {
   pixCode?: string
 }
 
-// GET - List all recharges
+// GET - List recharges. Admin vê todas; usuário vê apenas as próprias.
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const status = searchParams.get("status")
-  const userId = searchParams.get("userId")
+  const isAdmin = isAuthenticatedAdmin(request)
+  const isInternal = isInternalRequest(request)
 
   let filteredRecharges = [...recharges]
 
-  if (status) {
-    filteredRecharges = filteredRecharges.filter(r => r.status === status)
+  if (!isAdmin && !isInternal) {
+    const session = requireUser(request)
+    if (!session) return unauthorizedResponse()
+    filteredRecharges = filteredRecharges.filter(r => r.userId === session.uid)
   }
 
-  if (userId) {
-    filteredRecharges = filteredRecharges.filter(r => r.userId === userId)
+  if (status) {
+    filteredRecharges = filteredRecharges.filter(r => r.status === status)
   }
 
   // Sort by most recent first
@@ -51,11 +55,15 @@ export async function POST(request: NextRequest) {
     const data = await request.json()
 
     if (data.action === "create") {
+      // Identidade vem da sessão — nunca do corpo.
+      const session = requireUser(request)
+      if (!session) return unauthorizedResponse()
+
       const newRecharge: Recharge = {
         id: `recharge_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        userId: data.userId || "",
-        userName: data.userName || "",
-        userEmail: data.userEmail || "",
+        userId: session.uid,
+        userName: session.name || "",
+        userEmail: session.email,
         amount: parseFloat(data.amount) || 0,
         method: data.method || "pix",
         status: "pending",

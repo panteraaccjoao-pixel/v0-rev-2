@@ -71,6 +71,9 @@ export interface PixPayment {
   purpose: "recharge" | "purchase"
   credited?: boolean
   delivered?: boolean
+  // true quando os cartões reservados já foram devolvidos ao estoque
+  // (após expirar/cancelar). Evita devolução dupla.
+  restored?: boolean
   reservedCards: Product[]
   couponCode?: string
   items: Array<{

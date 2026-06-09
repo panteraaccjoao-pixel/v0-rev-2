@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { isAuthenticatedAdmin, isInternalRequest, unauthorizedResponse } from "@/lib/admin-auth"
 
 interface Feedback {
   id: string
@@ -15,7 +16,8 @@ interface Feedback {
 // In-memory storage for feedbacks
 const feedbacks: Feedback[] = []
 
-export async function GET() {
+export async function GET(request: Request) {
+  if (!isAuthenticatedAdmin(request)) return unauthorizedResponse()
   const totalRating = feedbacks.reduce((acc, f) => acc + f.rating, 0)
   const averageRating = feedbacks.length > 0 ? totalRating / feedbacks.length : 0
   const positivos = feedbacks.filter(f => f.rating >= 4).length
@@ -35,6 +37,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  if (!isAuthenticatedAdmin(request) && !isInternalRequest(request)) return unauthorizedResponse()
   try {
     const body = await request.json()
     const { action, ...data } = body
@@ -63,6 +66,7 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  if (!isAuthenticatedAdmin(request)) return unauthorizedResponse()
   const { searchParams } = new URL(request.url)
   const id = searchParams.get("id")
 

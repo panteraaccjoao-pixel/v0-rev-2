@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { isAuthenticatedAdmin, unauthorizedResponse } from "@/lib/admin-auth"
 
 // In-memory storage for products (replace with database in production)
 let products: Product[] = []
@@ -70,6 +71,7 @@ export async function GET(request: NextRequest) {
 
 // POST - Create a new product
 export async function POST(request: NextRequest) {
+  if (!isAuthenticatedAdmin(request)) return unauthorizedResponse()
   try {
     const body = await request.json()
     const { name, level, bank, flag, price, quantity } = body
@@ -105,6 +107,7 @@ export async function POST(request: NextRequest) {
 
 // DELETE - Remove a product
 export async function DELETE(request: NextRequest) {
+  if (!isAuthenticatedAdmin(request)) return unauthorizedResponse()
   try {
     const { searchParams } = new URL(request.url)
     const id = searchParams.get("id")
@@ -137,6 +140,7 @@ export async function DELETE(request: NextRequest) {
 
 // PATCH - Update product quantity (for purchases)
 export async function PATCH(request: NextRequest) {
+  if (!isAuthenticatedAdmin(request)) return unauthorizedResponse()
   try {
     const body = await request.json()
     const { id, action, quantity } = body
