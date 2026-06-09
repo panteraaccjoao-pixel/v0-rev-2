@@ -1,7 +1,18 @@
 import { NextRequest, NextResponse } from "next/server"
 import { verifyPassword } from "@/lib/repositories/crypto"
 import { createAdminToken, revokeAdminToken } from "@/lib/repositories/admin-session"
+import { isAuthenticatedAdmin } from "@/lib/admin-auth"
 import { findAdminByEmail } from "@/lib/repositories/settings"
+
+// Valida no servidor se o requisitante é um admin autenticado.
+// O AdminAuthGuard (client) chama esta rota antes de liberar o painel,
+// para que NÃO seja possível forjar uma sessão só mexendo no localStorage.
+export async function GET(request: NextRequest) {
+  if (isAuthenticatedAdmin(request)) {
+    return NextResponse.json({ authenticated: true })
+  }
+  return NextResponse.json({ authenticated: false }, { status: 401 })
+}
 
 export async function POST(request: NextRequest) {
   try {

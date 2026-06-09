@@ -18,49 +18,67 @@ export function AdminAuthGuard({ children }: { children: React.ReactNode }) {
       return
     }
 
+    let cancelled = false
+
     const redirectToLogin = () => {
+      try {
+        localStorage.removeItem("admin_session")
+      } catch {}
+      if (cancelled) return
       setIsAuthenticated(false)
       setIsLoading(false)
       router.replace("/paineladminseven/login")
       // Fallback: ensure navigation completes even if soft routing is blocked (e.g. preview iframe)
       setTimeout(() => {
-        if (window.location.pathname.startsWith("/paineladminseven") && window.location.pathname !== "/paineladminseven/login") {
+        if (
+          window.location.pathname.startsWith("/paineladminseven") &&
+          window.location.pathname !== "/paineladminseven/login"
+        ) {
           window.location.href = "/paineladminseven/login"
         }
       }, 400)
     }
 
-    let session: string | null = null
-    try {
-      session = localStorage.getItem("admin_session")
-    } catch {
-      session = null
-    }
+    const verify = async () => {
+      // Lê o token salvo no login (se houver).
+      let token: string | null = null
+      try {
+        const raw = localStorage.getItem("admin_session")
+        if (raw) token = JSON.parse(raw)?.token ?? null
+      } catch {
+        token = null
+      }
 
-    if (!session) {
-      redirectToLogin()
-      return
-    }
-
-    try {
-      const sessionData = JSON.parse(session)
-
-      // Check if session is expired
-      if (!sessionData.expiresAt || sessionData.expiresAt < Date.now()) {
-        try {
-          localStorage.removeItem("admin_session")
-        } catch {}
+      if (!token) {
         redirectToLogin()
         return
       }
 
-      setIsAuthenticated(true)
-      setIsLoading(false)
-    } catch {
+      // VALIDAÇÃO REAL NO SERVIDOR: o token precisa ter assinatura HMAC válida
+      // e não estar expirado. Não basta existir algo no localStorage — assim
+      // ninguém entra no painel forjando uma sessão pelo console do navegador.
       try {
-        localStorage.removeItem("admin_session")
-      } catch {}
-      redirectToLogin()
+        const res = await fetch("/api/admin/auth", {
+          method: "GET",
+          headers: { Authorization: `Bearer ${token}` },
+          cache: "no-store",
+        })
+        if (cancelled) return
+        if (res.ok) {
+          setIsAuthenticated(true)
+          setIsLoading(false)
+        } else {
+          redirectToLogin()
+        }
+      } catch {
+        redirectToLogin()
+      }
+    }
+
+    verify()
+
+    return () => {
+      cancelled = true
     }
   }, [pathname, router])
 
