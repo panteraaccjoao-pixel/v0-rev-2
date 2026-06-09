@@ -21,8 +21,8 @@ interface CheckoutItem {
 // 2. Aplica cupom (validado no servidor).
 // 3. Se o usuário tem saldo suficiente: desconta o saldo, baixa o estoque e
 //    entrega os cartões imediatamente.
-// 4. Se não tem saldo: gera o PIX e reserva os cartões (remove do estoque)
-//    até o pagamento ser confirmado.
+// 4. Se não tem saldo: gera o PIX. Os cartões NÃO saem do estoque agora —
+//    o estoque só é debitado quando o pagamento for confirmado.
 export async function POST(request: NextRequest) {
   try {
     const clientIP = getClientIP(request)
@@ -122,7 +122,9 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // 4. Sem saldo suficiente: gera PIX e reserva os cartões.
+    // Sem saldo suficiente: gera PIX. NÃO removemos os cartões do estoque
+    // agora — apenas guardamos quais foram selecionados. A baixa de estoque
+    // acontece somente quando o pagamento for confirmado.
     if (total <= 0) {
       return NextResponse.json({ error: "Valor inválido para pagamento" }, { status: 400 })
     }
@@ -132,13 +134,6 @@ export async function POST(request: NextRequest) {
     const qrCodeUrl =
       pix.qrCodeBase64 ||
       `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(pix.pixCode)}`
-
-    // Reserva os cartões removendo-os do estoque (evita venda dupla).
-    const reservedCards: Product[] = []
-    for (const card of selectedCards) {
-      const r = await removeStockById(card.id)
-      if (r) reservedCards.push(r)
-    }
 
     const payment: PixPayment = {
       id: pix.txId,
@@ -153,7 +148,9 @@ export async function POST(request: NextRequest) {
       userName: userName || undefined,
       purpose: "purchase",
       delivered: false,
-      reservedCards,
+      // Cartões selecionados para esta compra. Continuam no estoque até a
+      // confirmação do pagamento, quando são debitados e entregues.
+      reservedCards: selectedCards,
       couponCode: validCoupon?.code,
       items: items.map((i) => ({
         level: i.level,
