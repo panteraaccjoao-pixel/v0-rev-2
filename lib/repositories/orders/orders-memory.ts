@@ -22,9 +22,15 @@ export async function createOrder(data: CreateOrderInput): Promise<Order> {
 }
 
 export async function listOrders(filter?: ListOrdersFilter): Promise<Order[]> {
+  // Defesa em profundidade: sem um filtro de dono (userId/email), NUNCA devolve
+  // todos os pedidos do sistema. Listar tudo só é possível via chamada explícita.
+  if (!filter || (!filter.userId && !filter.email)) {
+    return []
+  }
+
   let result = state.orders
 
-  if (filter && (filter.userId || filter.email)) {
+  {
     const id = filter.userId?.toLowerCase()
     const email = filter.email?.toLowerCase()
     result = state.orders.filter((o) => {

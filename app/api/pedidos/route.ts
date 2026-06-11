@@ -21,25 +21,31 @@ export async function createOrderRecord(data: {
 }
 
 // GET - lista os pedidos do PRÓPRIO usuário autenticado.
-// Admin autenticado pode listar de qualquer usuário (via query).
+// O painel admin pode listar de um usuário específico, MAS apenas quando passa
+// userId/email explicitamente na query. Sem esse filtro, NUNCA devolvemos todos
+// os pedidos do sistema — isso vazaria os pedidos de um cliente para outro.
 export async function GET(request: NextRequest) {
   try {
-    const isAdmin = isAuthenticatedAdmin(request)
+    const { searchParams } = new URL(request.url)
+    const queryUserId = searchParams.get("userId")
+    const queryEmail = searchParams.get("email")
+    const hasExplicitFilter = !!(queryUserId || queryEmail)
 
-    if (isAdmin) {
-      const { searchParams } = new URL(request.url)
-      const userId = searchParams.get("userId")
-      const userEmail = searchParams.get("email")
-      const filteredOrders = await listOrders({ userId, email: userEmail })
+    // Branch admin: SOMENTE quando o admin pede um usuário específico via query.
+    // O painel (/gestaorevsystem/usuarios) sempre envia userId/email.
+    if (hasExplicitFilter && isAuthenticatedAdmin(request)) {
+      const filteredOrders = await listOrders({ userId: queryUserId, email: queryEmail })
       return NextResponse.json({ orders: filteredOrders, total: filteredOrders.length })
     }
 
+    // Caso geral (incluindo a aba pessoal "Meus Pedidos", mesmo se quem acessa
+    // também for admin): escopa SEMPRE ao usuário da sessão. Ignora qualquer
+    // userId/email vindos da query — a identidade vem só do token assinado.
     const session = requireUser(request)
     if (!session) {
       return unauthorizedResponse()
     }
 
-    // Sempre escopado ao usuário da sessão — ignora qualquer email/userId da query.
     const filteredOrders = await listOrders({ userId: session.uid, email: session.email })
 
     return NextResponse.json({
