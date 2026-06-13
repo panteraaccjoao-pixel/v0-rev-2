@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p \"C:\\\\Users\\\\Administrator\\\\Downloads\\\\v0-rev-2-main\\\\.claude\")",
+      "Bash(npm install *)"
+    ]
+  }
+}
