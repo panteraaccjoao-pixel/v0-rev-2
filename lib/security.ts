@@ -15,12 +15,14 @@ export const securityHeaders = {
   // Content Security Policy
   "Content-Security-Policy": [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+    "script-src 'self' 'unsafe-inline'",
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: https: blob:",
     "font-src 'self' data:",
     "connect-src 'self' https:",
     "frame-ancestors 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
   ].join("; "),
 }
 
@@ -45,16 +47,17 @@ export function isValidOrigin(request: Request): boolean {
     const hostDomain = host?.split(":")[0]
     return originUrl.hostname === hostDomain || 
            originUrl.hostname === "localhost" ||
-           originUrl.hostname.endsWith(".vercel.app")
+           originUrl.hostname === "revsystemcc.com" ||
+           originUrl.hostname.endsWith(".revsystemcc.com")
   } catch {
     return false
   }
 }
 
-// Sanitize user input to prevent XSS
+// Sanitize user input to prevent XSS (use only for HTML output, NOT for DB queries or emails)
 export function sanitizeInput(input: string): string {
   if (typeof input !== "string") return ""
-  
+
   return input
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -63,6 +66,12 @@ export function sanitizeInput(input: string): string {
     .replace(/'/g, "&#x27;")
     .replace(/\//g, "&#x2F;")
     .trim()
+}
+
+// Normaliza email para uso em DB/lógica — NÃO usa HTML encoding que corromperia endereços com /
+export function normalizeEmail(email: string): string {
+  if (typeof email !== "string") return ""
+  return email.trim().toLowerCase().slice(0, 254)
 }
 
 // Validate email format

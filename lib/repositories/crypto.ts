@@ -18,6 +18,9 @@ export function verifyPassword(password: string, stored?: string): boolean {
   if (!stored) return false
 
   if (!stored.includes(":")) {
+    // Texto plano nunca é aceito em produção
+    if (process.env.NODE_ENV !== "development") return false
+    console.warn("[Security] Plain-text password detected — hash it immediately")
     return stored === password
   }
 

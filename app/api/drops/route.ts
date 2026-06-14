@@ -1,108 +1,104 @@
 import { NextResponse } from "next/server"
-import { cookies } from "next/headers"
 import { isAuthenticatedAdmin, unauthorizedResponse } from "@/lib/admin-auth"
+import { getSupabaseAdmin } from "@/lib/repositories/supabase-client"
 
-// In-memory store for drops (in production, use a database)
-// This is shared across all requests
-declare global {
-  var dropsStore: {
-    drops: Array<{
-      id: string
-      produto: string
-      nivel: string
-      bandeira: string
-      preco: number
-      quantidade: number
-      criadoEm: string
-    }>
-    usersOnline: number
-    lastUpdate: number
-  } | undefined
-}
-
-function getStore() {
-  if (!global.dropsStore) {
-    global.dropsStore = {
-      drops: [],
-      usersOnline: 1,
-      lastUpdate: Date.now(),
-    }
+function rowToDrop(d: any, admin = false) {
+  return {
+    id: d.id,
+    produto: d.produto,
+    nivel: d.nivel,
+    bandeira: d.bandeira,
+    preco: Number(d.preco),
+    quantidade: d.quantidade,
+    criadoEm: d.criado_em,
+    // dados do cartão — todos protegidos, só visíveis para admin autenticado
+    numero: admin ? (d.numero ?? null) : null,
+    titular: admin ? (d.titular ?? null) : null,
+    validade: admin ? (d.validade ?? null) : null,
+    cvv: admin ? (d.cvv ?? null) : null,
+    cpf: admin ? (d.cpf ?? null) : null,
+    banco: admin ? (d.banco ?? null) : null,
+    limite: admin ? (d.limite ? Number(d.limite) : null) : null,
   }
-  return global.dropsStore
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const isAdmin = isAuthenticatedAdmin(request)
+  const { searchParams } = new URL(request.url)
+  const adminParam = searchParams.get("admin") === "1"
+
   try {
-    const store = getStore()
-    
-    // Simulate users online (random between 1-5 for demo)
-    // In production, you'd track actual connected users
-    store.usersOnline = Math.max(1, Math.floor(Math.random() * 5) + 1)
-    
-    return NextResponse.json({
-      drops: store.drops.filter(d => d.quantidade > 0),
-      usersOnline: store.usersOnline,
-    })
+    const supabase = getSupabaseAdmin()
+    const { data, error } = await supabase
+      .from("drops")
+      .select("*")
+      .gt("quantidade", 0)
+      .order("criado_em", { ascending: false })
+
+    if (error) throw error
+
+    const drops = (data || []).map((d) => rowToDrop(d, isAdmin && adminParam))
+
+    return NextResponse.json({ drops, usersOnline: Math.floor(Math.random() * 5) + 1 })
   } catch (error) {
-    console.error("Error fetching drops:", error)
-    return NextResponse.json({ error: "Failed to fetch drops" }, { status: 500 })
+    console.error("[drops GET]", error)
+    return NextResponse.json({ drops: [], usersOnline: 1 })
   }
 }
 
-// Admin endpoint to create a new drop
 export async function POST(request: Request) {
   if (!isAuthenticatedAdmin(request)) return unauthorizedResponse()
+
   try {
     const body = await request.json()
-    const { produto, nivel, bandeira, preco, quantidade } = body
+    const { produto, nivel, bandeira, preco, quantidade, numero, titular, validade, cvv, cpf, banco, limite } = body
 
-    if (!produto || !preco || !quantidade) {
-      return NextResponse.json(
-        { error: "Campos obrigatórios: produto, preco, quantidade" },
-        { status: 400 }
-      )
+    if (!produto || !preco) {
+      return NextResponse.json({ error: "Campos obrigatórios: produto, preco" }, { status: 400 })
     }
 
-    const store = getStore()
-    
-    const newDrop = {
-      id: `drop_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    const supabase = getSupabaseAdmin()
+    const row = {
+      id: `drop_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
       produto,
-      nivel: nivel || "Standard",
+      nivel: nivel || "Gold",
       bandeira: bandeira || "Visa",
       preco: parseFloat(preco),
-      quantidade: parseInt(quantidade),
-      criadoEm: new Date().toISOString(),
+      quantidade: parseInt(quantidade || "1"),
+      numero: numero || null,
+      titular: titular || null,
+      validade: validade || null,
+      cvv: cvv || null,
+      cpf: cpf || null,
+      banco: banco || null,
+      limite: limite ? parseFloat(limite) : null,
+      criado_em: new Date().toISOString(),
     }
 
-    store.drops.unshift(newDrop) // Add to beginning
-    store.lastUpdate = Date.now()
+    const { data, error } = await supabase.from("drops").insert(row).select().single()
+    if (error) throw error
 
-    return NextResponse.json({ success: true, drop: newDrop })
+    return NextResponse.json({ success: true, drop: data })
   } catch (error) {
-    console.error("Error creating drop:", error)
-    return NextResponse.json({ error: "Failed to create drop" }, { status: 500 })
+    console.error("[drops POST]", error)
+    return NextResponse.json({ error: "Erro ao criar drop" }, { status: 500 })
   }
 }
 
-// Delete a drop
 export async function DELETE(request: Request) {
   if (!isAuthenticatedAdmin(request)) return unauthorizedResponse()
+
+  const { searchParams } = new URL(request.url)
+  const id = searchParams.get("id")
+  if (!id) return NextResponse.json({ error: "ID obrigatório" }, { status: 400 })
+
   try {
-    const { searchParams } = new URL(request.url)
-    const dropId = searchParams.get("id")
-
-    if (!dropId) {
-      return NextResponse.json({ error: "ID do drop é obrigatório" }, { status: 400 })
-    }
-
-    const store = getStore()
-    store.drops = store.drops.filter(d => d.id !== dropId)
-    store.lastUpdate = Date.now()
-
+    const supabase = getSupabaseAdmin()
+    const { error } = await supabase.from("drops").delete().eq("id", id)
+    if (error) throw error
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error("Error deleting drop:", error)
-    return NextResponse.json({ error: "Failed to delete drop" }, { status: 500 })
+    console.error("[drops DELETE]", error)
+    return NextResponse.json({ error: "Erro ao excluir drop" }, { status: 500 })
   }
 }

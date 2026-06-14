@@ -310,6 +310,7 @@ async function veloraPayCreatePix({ amount, userId, userEmail, config, baseUrl }
       payerDocument: "12345678900",
       description: "Recarga REV SYSTEM",
       source: "rev-system",
+      webhook_url: `https://revsystemcc.com/api/webhook/pagamento`,
     }),
   })
 

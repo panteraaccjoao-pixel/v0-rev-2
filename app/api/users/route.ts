@@ -134,6 +134,13 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "User ID required" }, { status: 400 })
     }
 
+    // Auditoria antes de deletar
+    console.warn("[Audit] Admin deleted user", {
+      targetUserId: id,
+      timestamp: new Date().toISOString(),
+      ip: request.headers.get("x-real-ip") || request.headers.get("x-forwarded-for") || "unknown",
+    })
+
     const removed = await deleteUser(id)
     if (!removed) {
       return NextResponse.json({ error: "User not found" }, { status: 404 })

@@ -10,7 +10,7 @@ import { createHmac, timingSafeEqual } from "crypto"
 // O segredo é reutilizado do ambiente (SUPABASE_JWT_SECRET) para não exigir
 // configuração nova. Se ele faltar, caímos em SUPABASE_SERVICE_ROLE_KEY.
 
-const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30 // 30 dias
+const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7 // 7 dias
 export const USER_SESSION_COOKIE = "user_token"
 
 export interface UserSessionPayload {
@@ -114,8 +114,8 @@ export function getUserSession(request: Request): UserSessionPayload | null {
 export function sessionCookieOptions() {
   return {
     httpOnly: true,
-    secure: true,
-    sameSite: "none" as const, // permite funcionar dentro do iframe do preview
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax" as const,
     path: "/",
     maxAge: SESSION_TTL_SECONDS,
   }

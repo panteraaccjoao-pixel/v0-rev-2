@@ -1,8 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { useRouter } from "next/navigation"
-import { CreditCard, Search, ChevronDown, ShoppingCart, Check, Grid3X3, X, Plus, Minus, Trash2 } from "lucide-react"
+import { CreditCard, Search, ChevronDown, ShoppingCart, Check, Grid3X3, Tag, Shield, Zap } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import {
@@ -47,13 +46,8 @@ interface PurchasedCard {
   birthDate?: string
 }
 
-interface CartItem {
-  product: ProductGroup
-  quantity: number
-}
 
 export default function ComprarCartoesPage() {
-  const router = useRouter()
   const [searchTerm, setSearchTerm] = useState("")
   const [nivel, setNivel] = useState("Nível")
   const [bandeira, setBandeira] = useState("Bandeira")
@@ -63,9 +57,12 @@ export default function ComprarCartoesPage() {
   const [selectedProduct, setSelectedProduct] = useState<ProductGroup | null>(null)
   const [purchasing, setPurchasing] = useState(false)
   const [purchaseSuccess, setPurchaseSuccess] = useState(false)
+  const [couponCode, setCouponCode] = useState("")
+  const [couponDiscount, setCouponDiscount] = useState(0)
+  const [couponError, setCouponError] = useState("")
+  const [couponLoading, setCouponLoading] = useState(false)
   const [purchasedCard, setPurchasedCard] = useState<PurchasedCard | null>(null)
-  const [cart, setCart] = useState<CartItem[]>([])
-  const [showCart, setShowCart] = useState(false)
+  const [userBalance, setUserBalance] = useState(0)
 
   const fetchProducts = useCallback(async () => {
     try {
@@ -87,13 +84,22 @@ export default function ComprarCartoesPage() {
     }
   }, [nivel, bandeira, searchTerm])
 
+  const fetchBalance = useCallback(async () => {
+    try {
+      const res = await authFetch("/api/user/balance")
+      if (res.ok) {
+        const data = await res.json()
+        setUserBalance(data.balance || 0)
+      }
+    } catch {}
+  }, [])
+
   useEffect(() => {
     fetchProducts()
-    
-    // Poll for updates every 5 seconds
-    const interval = setInterval(fetchProducts, 5000)
+    fetchBalance()
+    const interval = setInterval(() => { fetchProducts(); fetchBalance() }, 5000)
     return () => clearInterval(interval)
-  }, [fetchProducts])
+  }, [fetchProducts, fetchBalance])
 
   const handlePurchase = async () => {
     if (!selectedProduct || !selectedProduct.products?.length) return
@@ -136,60 +142,30 @@ export default function ComprarCartoesPage() {
     setSelectedProduct(null)
     setPurchaseSuccess(false)
     setPurchasedCard(null)
+    setCouponCode("")
+    setCouponDiscount(0)
+    setCouponError("")
   }
 
-  const addToCart = (product: ProductGroup, e: React.MouseEvent) => {
-    e.stopPropagation()
-    
-    setCart(prevCart => {
-      const existingItem = prevCart.find(
-        item => item.product.bin === product.bin && 
-                item.product.level === product.level && 
-                item.product.brand === product.brand
-      )
-      
-      if (existingItem) {
-        // Increment quantity if item exists (max = available count)
-        if (existingItem.quantity < product.count) {
-          return prevCart.map(item => 
-            item === existingItem 
-              ? { ...item, quantity: item.quantity + 1 }
-              : item
-          )
-        }
-        return prevCart
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim() || !selectedProduct) return
+    setCouponLoading(true)
+    setCouponError("")
+    try {
+      const res = await fetch(`/api/checkout?coupon=${encodeURIComponent(couponCode.trim())}&subtotal=${selectedProduct.price}`)
+      const data = await res.json()
+      if (data.valid) {
+        setCouponDiscount(data.discount || 0)
+      } else {
+        setCouponDiscount(0)
+        setCouponError(data.message || "Cupom inválido")
       }
-      
-      // Add new item
-      return [...prevCart, { product, quantity: 1 }]
-    })
+    } catch {
+      setCouponError("Erro ao validar cupom")
+    } finally {
+      setCouponLoading(false)
+    }
   }
-
-  const removeFromCart = (index: number) => {
-    setCart(prevCart => prevCart.filter((_, i) => i !== index))
-  }
-
-  const updateCartQuantity = (index: number, newQuantity: number) => {
-    setCart(prevCart => {
-      const item = prevCart[index]
-      if (!item) return prevCart
-      
-      if (newQuantity <= 0) {
-        return prevCart.filter((_, i) => i !== index)
-      }
-      
-      if (newQuantity > item.product.count) {
-        return prevCart
-      }
-      
-      return prevCart.map((item, i) => 
-        i === index ? { ...item, quantity: newQuantity } : item
-      )
-    })
-  }
-
-  const cartTotal = cart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0)
-  const cartItemsCount = cart.reduce((sum, item) => sum + item.quantity, 0)
 
   const getBrandLogo = (brand: string) => {
     if (brand === "mastercard") {
@@ -236,26 +212,15 @@ export default function ComprarCartoesPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Comprar Cartoes</h1>
+          <h1 className="text-2xl font-bold text-foreground">Comprar Cartões</h1>
           <p className="text-sm text-muted-foreground">
-            Escolha um cartao e visualize os detalhes antes de comprar
+            Escolha um cartão e compre usando seu saldo
           </p>
         </div>
-        
-        {/* Cart Button */}
-        <Button 
-          variant="outline" 
-          className="relative gap-2"
-          onClick={() => setShowCart(true)}
-        >
-          <ShoppingCart className="h-5 w-5" />
-          Carrinho
-          {cartItemsCount > 0 && (
-            <span className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">
-              {cartItemsCount}
-            </span>
-          )}
-        </Button>
+        <div className="rounded-lg border border-border bg-card px-4 py-2 text-right">
+          <p className="text-xs text-muted-foreground">Seu saldo</p>
+          <p className="text-lg font-bold text-foreground">R$ {userBalance.toFixed(2).replace(".", ",")}</p>
+        </div>
       </div>
 
       {/* Filter Bar */}
@@ -372,19 +337,33 @@ export default function ComprarCartoesPage() {
                 ? product.expiry.split("/")[0]?.charAt(0) + "*/" + (product.expiry.split("/")[1]?.substring(0, 2) || "**") + "**"
                 : ""
               
+              const canAfford = userBalance >= product.price
               return (
-                <div 
+                <div
                   key={`${product.level}-${product.brand}-${index}`}
-                  className="group cursor-pointer overflow-hidden rounded-xl border border-border bg-gradient-to-br from-[#1a1a2e] via-[#16213e] to-[#0f0f1a] transition-all hover:border-red-500/50 hover:shadow-lg hover:shadow-red-500/10"
-                  onClick={() => setSelectedProduct(product)}
+                  className={`group overflow-hidden rounded-xl border bg-gradient-to-br from-[#1a1a2e] via-[#16213e] to-[#0f0f1a] transition-all ${
+                    canAfford
+                      ? "cursor-pointer border-border hover:border-red-500/50 hover:shadow-lg hover:shadow-red-500/10"
+                      : "cursor-not-allowed border-border"
+                  }`}
+                  onClick={() => canAfford && setSelectedProduct(product)}
                 >
                   {/* Card Top Section */}
                   <div className="p-4 pb-3">
                     <div className="flex items-start justify-between mb-4">
-                      {/* Grid Icon */}
-                      <div className="flex h-8 w-8 items-center justify-center rounded-md bg-amber-500/20">
-                        <Grid3X3 className="h-4 w-4 text-amber-400" />
-                      </div>
+                      {/* Chip de cartão */}
+                      <svg width="32" height="24" viewBox="0 0 32 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="1" y="1" width="30" height="22" rx="3" fill="#c8a84b" opacity="0.9"/>
+                        <line x1="11" y1="1" x2="11" y2="23" stroke="#a07a20" strokeWidth="0.8"/>
+                        <line x1="21" y1="1" x2="21" y2="23" stroke="#a07a20" strokeWidth="0.8"/>
+                        <line x1="1" y1="8" x2="31" y2="8" stroke="#a07a20" strokeWidth="0.8"/>
+                        <line x1="1" y1="16" x2="31" y2="16" stroke="#a07a20" strokeWidth="0.8"/>
+                        <rect x="11" y="8" width="10" height="8" fill="#d4a853" opacity="0.5"/>
+                        <rect x="2" y="2" width="8" height="5.2" rx="1" fill="#b8902a" opacity="0.4"/>
+                        <rect x="22" y="2" width="8" height="5.2" rx="1" fill="#b8902a" opacity="0.4"/>
+                        <rect x="2" y="16.8" width="8" height="5.2" rx="1" fill="#b8902a" opacity="0.4"/>
+                        <rect x="22" y="16.8" width="8" height="5.2" rx="1" fill="#b8902a" opacity="0.4"/>
+                      </svg>
                       
                       {/* Level Badge */}
                       <span className={`rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wide ${
@@ -438,37 +417,35 @@ export default function ComprarCartoesPage() {
                       <p className="text-xs text-red-400 mb-3">+ Dados incluídos</p>
                     )}
 
-                    {/* Action Buttons */}
-                    <div className="flex items-center gap-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="flex-1 border-border/50 bg-transparent hover:bg-white/5"
-                        onClick={(e) => addToCart(product, e)}
-                      >
-                        <ShoppingCart className="h-4 w-4 mr-2" />
-                        Carrinho
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        className="flex-1 bg-red-600 hover:bg-red-700 text-white"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          // Save single item to checkout and redirect
-                          const checkoutItems = [{
-                            id: product.products?.[0]?.id || `item_${Date.now()}`,
-                            level: product.level,
-                            brand: product.brand,
-                            bin: product.bin,
-                            price: product.price,
-                            quantity: 1
-                          }]
-                          localStorage.setItem("checkout_cart", JSON.stringify(checkoutItems))
-                          router.push("/dashboard/checkout")
-                        }}
-                      >
-                        Comprar
-                      </Button>
+                    {/* Action Row */}
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs text-muted-foreground">VALOR</p>
+                        <p className="text-base font-bold text-white">
+                          R$ {product.price.toFixed(2).replace(".", ",")}
+                        </p>
+                      </div>
+                      {userBalance >= product.price ? (
+                        <Button
+                          size="sm"
+                          className="bg-red-600 hover:bg-red-700 text-white px-5"
+                          onClick={(e) => { e.stopPropagation(); setSelectedProduct(product) }}
+                        >
+                          <ShoppingCart className="h-3.5 w-3.5 mr-1.5" />
+                          Comprar
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="cursor-not-allowed opacity-60 px-4"
+                          disabled
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <ShoppingCart className="h-3.5 w-3.5 mr-1.5" />
+                          Saldo insuficiente
+                        </Button>
+                      )}
                     </div>
 
                     {/* Stock indicator */}
@@ -485,246 +462,182 @@ export default function ComprarCartoesPage() {
 
       {/* Purchase Dialog */}
       <Dialog open={!!selectedProduct} onOpenChange={handleCloseDialog}>
-        <DialogContent className="bg-card border-border">
-          <DialogHeader>
-            <DialogTitle>
-              {purchaseSuccess ? "Compra Realizada!" : "Confirmar Compra"}
-            </DialogTitle>
-            <DialogDescription>
-              {purchaseSuccess 
-                ? "Aqui estão os dados do seu cartão" 
-                : "Revise os detalhes antes de confirmar"}
-            </DialogDescription>
+        <DialogContent className="bg-[#0f0f1a] border-white/10 p-0 overflow-hidden max-w-md">
+          <DialogHeader className="sr-only">
+            <DialogTitle>{purchaseSuccess ? "Compra Realizada!" : "Confirmar Compra"}</DialogTitle>
+            <DialogDescription>{purchaseSuccess ? "Dados do cartão" : "Revise antes de confirmar"}</DialogDescription>
           </DialogHeader>
-          
+
           {selectedProduct && (
-            <div className="space-y-4 py-4">
+            <div>
               {purchaseSuccess && purchasedCard ? (
-                <div className="space-y-4">
-                  <div className="flex flex-col items-center justify-center py-4 text-center">
-                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-500/20 mb-4">
-                      <Check className="h-8 w-8 text-green-500" />
+                /* ── Tela de sucesso ── */
+                <div className="p-6 space-y-4">
+                  <div className="flex flex-col items-center py-4 text-center">
+                    <div className="flex h-14 w-14 items-center justify-center rounded-full bg-green-500/15 ring-1 ring-green-500/30 mb-3">
+                      <Check className="h-7 w-7 text-green-400" />
                     </div>
+                    <p className="text-lg font-bold text-white">Compra Realizada!</p>
+                    <p className="text-xs text-muted-foreground mt-1">Aqui estão os dados do seu cartão</p>
                   </div>
-                  
-                  {/* Card Data */}
-                  <div className="rounded-lg bg-secondary/50 p-4 space-y-3">
+
+                  <div className="rounded-xl bg-white/5 border border-white/8 p-4 space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Número</span>
-                      <span className="font-mono font-medium">{purchasedCard.fullCard || "****"}</span>
+                      <span className="text-xs text-muted-foreground">Número</span>
+                      <span className="font-mono text-sm font-semibold text-white">{purchasedCard.fullCard || "****"}</span>
                     </div>
+                    <div className="h-px bg-white/5" />
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Validade</span>
-                      <span className="font-mono font-medium">{purchasedCard.expiry || "**/**"}</span>
+                      <span className="text-xs text-muted-foreground">Validade</span>
+                      <span className="font-mono text-sm font-semibold text-white">{purchasedCard.expiry || "**/**"}</span>
                     </div>
+                    <div className="h-px bg-white/5" />
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">CVV</span>
-                      <span className="font-mono font-medium">{purchasedCard.cvv || "***"}</span>
+                      <span className="text-xs text-muted-foreground">CVV</span>
+                      <span className="font-mono text-sm font-semibold text-white">{purchasedCard.cvv || "***"}</span>
                     </div>
+                    <div className="h-px bg-white/5" />
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Banco</span>
-                      <span className="font-medium">{purchasedCard.bank || "N/A"}</span>
+                      <span className="text-xs text-muted-foreground">Banco</span>
+                      <span className="text-sm font-medium text-white">{purchasedCard.bank || "N/A"}</span>
                     </div>
+                    <div className="h-px bg-white/5" />
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Nível</span>
-                      <span className={`font-medium ${getLevelColor(purchasedCard.level)}`}>
-                        {purchasedCard.level}
-                      </span>
+                      <span className="text-xs text-muted-foreground">Nível</span>
+                      <span className={`text-sm font-bold ${getLevelColor(purchasedCard.level)}`}>{purchasedCard.level}</span>
                     </div>
                   </div>
 
-                  {/* Holder Data */}
                   {(purchasedCard.holderName || purchasedCard.cpf || purchasedCard.birthDate) && (
-                    <div className="rounded-lg bg-secondary/50 p-4 space-y-3">
-                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Dados do Titular</p>
+                    <div className="rounded-xl bg-white/5 border border-white/8 p-4 space-y-3">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Dados do Titular</p>
                       {purchasedCard.holderName && (
                         <div className="flex items-center justify-between">
-                          <span className="text-sm text-muted-foreground">Nome</span>
-                          <span className="font-medium">{purchasedCard.holderName}</span>
+                          <span className="text-xs text-muted-foreground">Nome</span>
+                          <span className="text-sm font-medium text-white">{purchasedCard.holderName}</span>
                         </div>
                       )}
                       {purchasedCard.cpf && (
                         <div className="flex items-center justify-between">
-                          <span className="text-sm text-muted-foreground">CPF</span>
-                          <span className="font-mono font-medium">{purchasedCard.cpf}</span>
+                          <span className="text-xs text-muted-foreground">CPF</span>
+                          <span className="font-mono text-sm text-white">{purchasedCard.cpf}</span>
                         </div>
                       )}
                       {purchasedCard.birthDate && (
                         <div className="flex items-center justify-between">
-                          <span className="text-sm text-muted-foreground">Nascimento</span>
-                          <span className="font-mono font-medium">{purchasedCard.birthDate}</span>
+                          <span className="text-xs text-muted-foreground">Nascimento</span>
+                          <span className="font-mono text-sm text-white">{purchasedCard.birthDate}</span>
                         </div>
                       )}
                     </div>
                   )}
 
-                  <p className="text-xs text-center text-muted-foreground">
-                    Guarde essas informações em local seguro. O cartão foi adicionado aos seus pedidos.
-                  </p>
-                  
-                  <Button className="w-full" onClick={handleCloseDialog}>
-                    Fechar
-                  </Button>
+                  <p className="text-xs text-center text-muted-foreground">Guarde em local seguro. O cartão foi adicionado aos seus pedidos.</p>
+                  <Button className="w-full bg-white/10 hover:bg-white/15 text-white border-0" onClick={handleCloseDialog}>Fechar</Button>
                 </div>
               ) : (
-                <>
-                  <div className="rounded-lg bg-secondary/50 p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className={`text-lg font-bold ${getLevelColor(selectedProduct.level)}`}>
-                        {selectedProduct.level}
-                      </span>
-                      {getBrandLogo(selectedProduct.brand)}
-                    </div>
-                    <p className="text-sm text-muted-foreground capitalize">
-                      {selectedProduct.brand} - Credit
-                    </p>
-                  </div>
+                /* ── Tela de confirmação ── */
+                <div>
+                  <div className="p-6 space-y-5">
+                    {/* Título */}
+                    <h2 className="text-lg font-bold text-white">Finalizar Compra</h2>
 
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Disponíveis</span>
-                      <span>{selectedProduct.count} unidades</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Preço unitário</span>
-                      <span className="font-bold text-accent">
+                    {/* Item */}
+                    <div className="flex items-center gap-3 rounded-xl bg-white/5 border border-white/8 px-4 py-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/8">
+                        <CreditCard className="h-5 w-5 text-muted-foreground" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-white">{selectedProduct.level}</p>
+                        <p className="text-xs text-muted-foreground capitalize">{selectedProduct.brand} · {selectedProduct.bank}</p>
+                      </div>
+                      <span className="text-sm font-bold text-white">
                         R$ {selectedProduct.price.toFixed(2).replace('.', ',')}
                       </span>
                     </div>
-                  </div>
 
-                  <Button 
-                    className="w-full" 
-                    onClick={handlePurchase}
-                    disabled={purchasing}
-                  >
-                    {purchasing ? (
-                      <>
-                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-background border-t-transparent mr-2" />
-                        Processando...
-                      </>
-                    ) : (
-                      <>
-                        <ShoppingCart className="h-4 w-4 mr-2" />
-                        Confirmar Compra - R$ {selectedProduct.price.toFixed(2).replace('.', ',')}
-                      </>
-                    )}
-                  </Button>
-                </>
+                    {/* Resumo */}
+                    <div className="rounded-xl border border-white/8 overflow-hidden divide-y divide-white/5">
+                      <div className="flex justify-between items-center px-4 py-3">
+                        <span className="text-sm text-muted-foreground">Subtotal</span>
+                        <span className="text-sm text-white">R$ {selectedProduct.price.toFixed(2).replace('.', ',')}</span>
+                      </div>
+                      {couponDiscount > 0 && (
+                        <div className="flex justify-between items-center px-4 py-3">
+                          <span className="text-sm text-green-400">Desconto</span>
+                          <span className="text-sm font-semibold text-green-400">- R$ {couponDiscount.toFixed(2).replace('.', ',')}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between items-center px-4 py-3">
+                        <span className="text-sm text-muted-foreground">Método</span>
+                        <span className="text-sm text-white">Saldo</span>
+                      </div>
+                      <div className="flex justify-between items-center px-4 py-3 bg-white/3">
+                        <span className="text-sm font-bold text-white">Total</span>
+                        <span className="text-sm font-bold text-white">
+                          R$ {Math.max(0, selectedProduct.price - couponDiscount).toFixed(2).replace('.', ',')}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Cupom */}
+                    <div className="space-y-1.5">
+                      <div className="flex gap-2">
+                        <div className="relative flex-1">
+                          <Tag className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            placeholder="Cupom de desconto"
+                            value={couponCode}
+                            onChange={(e) => { setCouponCode(e.target.value.toUpperCase()); setCouponError(""); setCouponDiscount(0) }}
+                            onKeyDown={(e) => e.key === "Enter" && handleApplyCoupon()}
+                            className="pl-9 bg-white/5 border-white/10 text-white placeholder:text-muted-foreground h-10 text-sm"
+                          />
+                        </div>
+                        <Button
+                          variant="outline"
+                          className="h-10 px-4 border-white/10 bg-white/5 text-white hover:bg-white/10 text-sm"
+                          onClick={handleApplyCoupon}
+                          disabled={couponLoading || !couponCode.trim()}
+                        >
+                          {couponLoading ? <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/30 border-t-white" /> : "Aplicar"}
+                        </Button>
+                      </div>
+                      {couponError && <p className="text-xs text-red-400 pl-1">{couponError}</p>}
+                      {couponDiscount > 0 && <p className="text-xs text-green-400 pl-1">✓ Cupom aplicado com sucesso</p>}
+                    </div>
+
+                    {/* Botão */}
+                    <Button
+                      className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold h-12 rounded-xl text-sm"
+                      onClick={handlePurchase}
+                      disabled={purchasing}
+                    >
+                      {purchasing ? (
+                        <>
+                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white mr-2" />
+                          Processando...
+                        </>
+                      ) : (
+                        <>
+                          <Check className="h-4 w-4 mr-2" />
+                          Pagar R$ {Math.max(0, selectedProduct.price - couponDiscount).toFixed(2).replace('.', ',')} via Saldo
+                        </>
+                      )}
+                    </Button>
+
+                    {/* Rodapé */}
+                    <p className="text-xs text-center text-muted-foreground flex items-center justify-center gap-1.5">
+                      <Shield className="h-3.5 w-3.5" />
+                      Pagamento seguro · Entrega instantânea
+                    </p>
+                  </div>
+                </div>
               )}
             </div>
           )}
         </DialogContent>
       </Dialog>
 
-      {/* Cart Dialog */}
-      <Dialog open={showCart} onOpenChange={setShowCart}>
-        <DialogContent className="bg-card border-border max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <ShoppingCart className="h-5 w-5" />
-              Carrinho
-            </DialogTitle>
-            <DialogDescription>
-              {cart.length === 0 
-                ? "Seu carrinho esta vazio" 
-                : `${cartItemsCount} item(s) no carrinho`}
-            </DialogDescription>
-          </DialogHeader>
-          
-          {cart.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-8 text-center">
-              <ShoppingCart className="h-12 w-12 text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">Adicione itens ao carrinho para comprar</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {/* Cart Items */}
-              <div className="max-h-[300px] overflow-y-auto space-y-3">
-                {cart.map((item, index) => (
-                  <div 
-                    key={`${item.product.bin}-${item.product.level}-${index}`}
-                    className="flex items-center justify-between rounded-lg bg-secondary/50 p-3"
-                  >
-                    <div className="flex-1">
-                      <p className="font-medium text-sm">
-                        {item.product.level} {item.product.brand}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        BIN: {item.product.bin} - R$ {item.product.price.toFixed(2).replace('.', ',')}
-                      </p>
-                    </div>
-                    
-                    <div className="flex items-center gap-2">
-                      <div className="flex items-center gap-1 rounded-lg border border-border">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={() => updateCartQuantity(index, item.quantity - 1)}
-                        >
-                          <Minus className="h-3 w-3" />
-                        </Button>
-                        <span className="w-6 text-center text-sm font-medium">
-                          {item.quantity}
-                        </span>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={() => updateCartQuantity(index, item.quantity + 1)}
-                          disabled={item.quantity >= item.product.count}
-                        >
-                          <Plus className="h-3 w-3" />
-                        </Button>
-                      </div>
-                      
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-red-500 hover:text-red-600 hover:bg-red-500/10"
-                        onClick={() => removeFromCart(index)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              
-              {/* Cart Total */}
-              <div className="border-t border-border pt-4">
-                <div className="flex items-center justify-between mb-4">
-                  <span className="text-muted-foreground">Total</span>
-                  <span className="text-xl font-bold text-accent">
-                    R$ {cartTotal.toFixed(2).replace('.', ',')}
-                  </span>
-                </div>
-                
-                <Button 
-                  className="w-full bg-red-600 hover:bg-red-700"
-                  onClick={() => {
-                    // Save cart to localStorage and redirect to checkout
-                    const checkoutItems = cart.map(item => ({
-                      id: item.product.products?.[0]?.id || `item_${Date.now()}`,
-                      level: item.product.level,
-                      brand: item.product.brand,
-                      bin: item.product.bin,
-                      price: item.product.price,
-                      quantity: item.quantity
-                    }))
-                    localStorage.setItem("checkout_cart", JSON.stringify(checkoutItems))
-                    setShowCart(false)
-                    router.push("/dashboard/checkout")
-                  }}
-                >
-                  Finalizar Compra
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

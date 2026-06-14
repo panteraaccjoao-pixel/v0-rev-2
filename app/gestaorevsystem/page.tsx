@@ -311,37 +311,49 @@ export default function AdminDashboard() {
           <CardContent>
             <div className="h-[300px]">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis 
-                    dataKey="day" 
-                    stroke="hsl(var(--muted-foreground))"
-                    fontSize={12}
+                <LineChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorFat" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#ef4444" stopOpacity={0.15}/>
+                      <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
+                  <XAxis
+                    dataKey="day"
+                    stroke="#52525b"
+                    fontSize={11}
                     tickLine={false}
                     axisLine={false}
+                    tick={{ fill: "#71717a" }}
                   />
-                  <YAxis 
-                    stroke="hsl(var(--muted-foreground))"
-                    fontSize={12}
+                  <YAxis
+                    stroke="#52525b"
+                    fontSize={11}
                     tickLine={false}
                     axisLine={false}
-                    tickFormatter={(value) => `R$${value}`}
+                    tick={{ fill: "#71717a" }}
+                    tickFormatter={(v) => `R$${v}`}
+                    width={55}
                   />
-                  <Tooltip 
+                  <Tooltip
                     contentStyle={{
-                      backgroundColor: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
+                      backgroundColor: "#18181b",
+                      border: "1px solid #3f3f46",
                       borderRadius: "8px",
+                      fontSize: "12px",
                     }}
-                    labelStyle={{ color: "hsl(var(--foreground))" }}
+                    labelStyle={{ color: "#e4e4e7", marginBottom: 4 }}
                     formatter={(value: number) => [formatCurrency(value), "Faturamento"]}
+                    cursor={{ stroke: "#ef4444", strokeWidth: 1, strokeDasharray: "4 4" }}
                   />
-                  <Line 
-                    type="monotone" 
-                    dataKey="vendas" 
-                    stroke="hsl(var(--accent))" 
+                  <Line
+                    type="monotone"
+                    dataKey="vendas"
+                    stroke="#ef4444"
                     strokeWidth={2}
-                    dot={{ fill: "hsl(var(--accent))", strokeWidth: 2, r: 4 }}
+                    dot={{ fill: "#ef4444", stroke: "#18181b", strokeWidth: 2, r: 4 }}
+                    activeDot={{ r: 6, fill: "#ef4444", stroke: "#18181b", strokeWidth: 2 }}
                     name="Faturamento"
                   />
                 </LineChart>

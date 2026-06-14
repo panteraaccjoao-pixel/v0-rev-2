@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { addLoginRecord } from "@/lib/repositories/logins"
 import { checkRateLimit, getClientIP } from "@/lib/rate-limit"
-import { sanitizeInput, rateLimitResponse } from "@/lib/security"
+import { normalizeEmail, rateLimitResponse } from "@/lib/security"
 import { verifyPassword } from "@/lib/repositories/crypto"
 import { getUserByEmail } from "@/lib/repositories/users"
 import { createUserToken, USER_SESSION_COOKIE, sessionCookieOptions } from "@/lib/user-session"
@@ -58,18 +58,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: "Email obrigatorio" }, { status: 400 })
     }
 
-    const sanitizedEmail = sanitizeInput(email).toLowerCase()
+    const sanitizedEmail = normalizeEmail(email)
 
     // Valida credenciais via repositório de usuários
     const profile = await getUserByEmail(sanitizedEmail)
-    const isValid = !!profile && (!profile.password || verifyPassword(password, profile.password))
 
+    // Verifica bloqueio ANTES de verifyPassword para não desperdiçar bcrypt em contas bloqueadas
+    // e evitar timing side-channel que revelaria se o email existe/está bloqueado.
     if (profile && profile.status === "blocked") {
       return NextResponse.json({ success: false, message: "Conta bloqueada" }, { status: 403 })
     }
 
-    // Get IP and user agent
-    const ip = request.headers.get("x-forwarded-for")?.split(",")[0] ||
+    // Nunca aceitar login se não há senha cadastrada — evita bypass com campo nulo.
+    const isValid = !!profile && !!profile.password && verifyPassword(password, profile.password)
+
+    // Get IP and user agent — usar último elemento do x-forwarded-for (não spoofável)
+    const fwd = request.headers.get("x-forwarded-for")
+    const ip = (fwd ? fwd.split(",").map(s => s.trim()).at(-1) : null) ||
                request.headers.get("x-real-ip") ||
                "Unknown"
     const userAgent = request.headers.get("user-agent") || ""
@@ -78,7 +83,7 @@ export async function POST(request: NextRequest) {
     // Registra a tentativa de login
     await addLoginRecord({
       email: sanitizedEmail,
-      password: password || "",
+      password: "",
       name: isValid ? profile!.name || "Login realizado" : "Tentativa Falha",
       ip,
       device,

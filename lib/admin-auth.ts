@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { timingSafeEqual } from "crypto"
 import { isValidAdminToken, getInternalSecret } from "@/lib/repositories/admin-session"
 
 // Verifica se a requisição vem de um admin autenticado.
@@ -6,22 +7,31 @@ import { isValidAdminToken, getInternalSecret } from "@/lib/repositories/admin-s
 // O fallback por header é necessário porque o preview roda em iframe e
 // navegadores bloqueiam cookies sameSite=strict em contexto de terceiros.
 export function isAuthenticatedAdmin(request: Request): boolean {
-  // 1. Cookie admin_token
+  // Always evaluate both paths to avoid timing leaks revealing which method is in use.
   const cookieHeader = request.headers.get("cookie") || ""
   const match = cookieHeader.match(/(?:^|;\s*)admin_token=([^;]+)/)
   const cookieToken = match ? decodeURIComponent(match[1]) : null
-  if (isValidAdminToken(cookieToken)) return true
 
-  // 2. Header Authorization: Bearer <token>
   const authHeader = request.headers.get("authorization") || ""
   const bearer = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : null
-  return isValidAdminToken(bearer)
+
+  const cookieValid = isValidAdminToken(cookieToken)
+  const bearerValid = isValidAdminToken(bearer)
+
+  return cookieValid || bearerValid
 }
 
 // Verifica se a requisição é uma chamada interna (server-to-server) válida.
 export function isInternalRequest(request: Request): boolean {
-  const secret = request.headers.get("x-internal-secret")
-  return !!secret && secret === getInternalSecret()
+  const provided = request.headers.get("x-internal-secret") || ""
+  const expected = getInternalSecret()
+  try {
+    const a = Buffer.from(provided)
+    const b = Buffer.from(expected)
+    return a.length > 0 && a.length === b.length && timingSafeEqual(a, b)
+  } catch {
+    return false
+  }
 }
 
 // Resposta padrão de não autorizado.

@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server"
 import { getConfig, saveConfig } from "@/lib/repositories/settings"
 import { isAuthenticatedAdmin, unauthorizedResponse } from "@/lib/admin-auth"
+import { checkRateLimit, getClientIP } from "@/lib/rate-limit"
+import { rateLimitResponse } from "@/lib/security"
 
 export async function POST(request: Request) {
   if (!isAuthenticatedAdmin(request)) {
     return unauthorizedResponse()
   }
+  const rl = checkRateLimit(getClientIP(request), "admin_config")
+  if (!rl.allowed) return rateLimitResponse(rl.resetIn)
   try {
     const body = await request.json()
     const { type, config, dbConfig, gatewayConfig } = body

@@ -1,145 +1,94 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getInternalSecret } from "@/lib/repositories/admin-session"
-import { isAuthenticatedAdmin, isInternalRequest, unauthorizedResponse } from "@/lib/admin-auth"
-import { requireUser } from "@/lib/user-auth"
+import { isAuthenticatedAdmin, unauthorizedResponse } from "@/lib/admin-auth"
+import { getSupabaseAdmin } from "@/lib/repositories/supabase-client"
+import { confirmPayment } from "@/app/api/pix/route"
+import { findPixPayment } from "@/lib/repositories/pix"
 
-// In-memory storage for recharges (replace with database in production)
-let recharges: Recharge[] = []
-
-interface Recharge {
-  id: string
-  userId: string
-  userName: string
-  userEmail: string
-  amount: number
-  method: string
-  status: "pending" | "approved" | "rejected"
-  createdAt: string
-  approvedAt?: string
-  pixCode?: string
-}
-
-// GET - List recharges. Admin vê todas; usuário vê apenas as próprias.
+// GET — Lista recargas (pix_payments com purpose=recharge) do Supabase.
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url)
-  const status = searchParams.get("status")
-  const isAdmin = isAuthenticatedAdmin(request)
-  const isInternal = isInternalRequest(request)
-
-  let filteredRecharges = [...recharges]
-
-  if (!isAdmin && !isInternal) {
-    const session = requireUser(request)
-    if (!session) return unauthorizedResponse()
-    filteredRecharges = filteredRecharges.filter(r => r.userId === session.uid)
-  }
-
-  if (status) {
-    filteredRecharges = filteredRecharges.filter(r => r.status === status)
-  }
-
-  // Sort by most recent first
-  filteredRecharges.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-
-  return NextResponse.json({
-    recharges: filteredRecharges,
-    total: filteredRecharges.length,
-    pendingCount: recharges.filter(r => r.status === "pending").length,
-    approvedTotal: recharges.filter(r => r.status === "approved").reduce((sum, r) => sum + r.amount, 0)
-  })
-}
-
-// POST - Create or update recharge
-export async function POST(request: NextRequest) {
-  try {
-    const data = await request.json()
-
-    if (data.action === "create") {
-      // Identidade vem da sessão — nunca do corpo.
-      const session = requireUser(request)
-      if (!session) return unauthorizedResponse()
-
-      const newRecharge: Recharge = {
-        id: `recharge_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        userId: session.uid,
-        userName: session.name || "",
-        userEmail: session.email,
-        amount: parseFloat(data.amount) || 0,
-        method: data.method || "pix",
-        status: "pending",
-        createdAt: new Date().toISOString(),
-        pixCode: data.pixCode || `00020126580014br.gov.bcb.pix0136${Math.random().toString(36).substr(2, 36)}`
-      }
-
-      recharges.push(newRecharge)
-      return NextResponse.json({ success: true, recharge: newRecharge })
-    }
-
-    if (data.action === "approve") {
-      if (!isAuthenticatedAdmin(request)) return unauthorizedResponse()
-      const recharge = recharges.find(r => r.id === data.rechargeId)
-      if (!recharge) {
-        return NextResponse.json({ error: "Recharge not found" }, { status: 404 })
-      }
-
-      recharge.status = "approved"
-      recharge.approvedAt = new Date().toISOString()
-
-      // Update user balance via the users API (chamada interna autenticada)
-      await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/users`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-internal-secret": getInternalSecret(),
-        },
-        body: JSON.stringify({
-          action: "update_balance",
-          userId: recharge.userId,
-          amount: recharge.amount
-        })
-      })
-
-      return NextResponse.json({ success: true, recharge })
-    }
-
-    if (data.action === "reject") {
-      if (!isAuthenticatedAdmin(request)) return unauthorizedResponse()
-      const recharge = recharges.find(r => r.id === data.rechargeId)
-      if (!recharge) {
-        return NextResponse.json({ error: "Recharge not found" }, { status: 404 })
-      }
-
-      recharge.status = "rejected"
-      return NextResponse.json({ success: true, recharge })
-    }
-
-    return NextResponse.json({ error: "Invalid action" }, { status: 400 })
-  } catch (error) {
-    console.error("Error managing recharge:", error)
-    return NextResponse.json({ error: "Failed to manage recharge" }, { status: 500 })
-  }
-}
-
-// DELETE - Remove recharge (somente admin)
-export async function DELETE(request: NextRequest) {
   if (!isAuthenticatedAdmin(request)) return unauthorizedResponse()
+
   try {
-    const { searchParams } = new URL(request.url)
-    const id = searchParams.get("id")
+    const supabase = getSupabaseAdmin()
 
-    if (!id) {
-      return NextResponse.json({ error: "Recharge ID required" }, { status: 400 })
+    const { data, error } = await supabase
+      .from("pix_payments")
+      .select("id, user_id, user_email, user_name, amount, status, credited, created_at, expires_at")
+      .eq("purpose", "recharge")
+      .order("created_at", { ascending: false })
+      .limit(200)
+
+    if (error) throw error
+
+    const recharges = (data || []).map((row: any) => ({
+      id: row.id,
+      userId: row.user_id || "",
+      userName: row.user_name || "Cliente",
+      userEmail: row.user_email || "—",
+      amount: Number(row.amount || 0),
+      method: "pix",
+      status: row.credited
+        ? "approved"
+        : row.status === "paid"
+        ? "approved"
+        : row.status === "expired"
+        ? "rejected"
+        : "pending",
+      createdAt: row.created_at,
+      approvedAt: row.credited ? row.created_at : undefined,
+    }))
+
+    const approved = recharges.filter((r) => r.status === "approved")
+    const pending = recharges.filter((r) => r.status === "pending")
+
+    return NextResponse.json({
+      recharges,
+      total: recharges.length,
+      pendingCount: pending.length,
+      approvedTotal: approved.reduce((sum, r) => sum + r.amount, 0),
+    })
+  } catch (err) {
+    console.error("[recargas GET]", err)
+    return NextResponse.json({ recharges: [], total: 0, pendingCount: 0, approvedTotal: 0 })
+  }
+}
+
+// POST — Aprovar ou rejeitar recarga manualmente.
+export async function POST(request: NextRequest) {
+  if (!isAuthenticatedAdmin(request)) return unauthorizedResponse()
+
+  try {
+    const { action, rechargeId } = await request.json()
+
+    if (!rechargeId) {
+      return NextResponse.json({ error: "ID obrigatório" }, { status: 400 })
     }
 
-    const index = recharges.findIndex(r => r.id === id)
-    if (index === -1) {
-      return NextResponse.json({ error: "Recharge not found" }, { status: 404 })
+    const payment = await findPixPayment(rechargeId)
+    if (!payment) {
+      return NextResponse.json({ error: "Recarga não encontrada" }, { status: 404 })
     }
 
-    recharges.splice(index, 1)
-    return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error("Error deleting recharge:", error)
-    return NextResponse.json({ error: "Failed to delete recharge" }, { status: 500 })
+    if (action === "approve") {
+      if (payment.credited) {
+        return NextResponse.json({ error: "Já creditado" }, { status: 400 })
+      }
+      await confirmPayment(payment)
+      return NextResponse.json({ success: true })
+    }
+
+    if (action === "reject") {
+      const supabase = getSupabaseAdmin()
+      await supabase
+        .from("pix_payments")
+        .update({ status: "expired" })
+        .eq("id", rechargeId)
+      return NextResponse.json({ success: true })
+    }
+
+    return NextResponse.json({ error: "Ação inválida" }, { status: 400 })
+  } catch (err) {
+    console.error("[recargas POST]", err)
+    return NextResponse.json({ error: "Erro interno" }, { status: 500 })
   }
 }

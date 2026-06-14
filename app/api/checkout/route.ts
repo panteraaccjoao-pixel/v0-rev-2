@@ -78,7 +78,9 @@ export async function POST(request: NextRequest) {
     let discountAmount = 0
     let validCoupon: CouponValidation | null = null
     if (couponCode) {
-      validCoupon = await validateCoupon(couponCode, subtotal)
+      // Sanitiza o código antes de qualquer operação
+      const sanitizedCoupon = String(couponCode).trim().toUpperCase().replace(/[^A-Z0-9\-]/g, "").slice(0, 50)
+      validCoupon = await validateCoupon(sanitizedCoupon, subtotal)
       if (validCoupon) {
         discountAmount = validCoupon.discountAmount
       }

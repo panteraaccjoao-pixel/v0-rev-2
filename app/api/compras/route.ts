@@ -1,97 +1,64 @@
 import { NextResponse } from "next/server"
-import { isAuthenticatedAdmin, isInternalRequest, unauthorizedResponse } from "@/lib/admin-auth"
-
-interface Compra {
-  id: string
-  userId: string
-  userName: string
-  userEmail: string
-  productId: string
-  productName: string
-  bin: string
-  value: number
-  status: "entregue" | "pendente" | "cancelado"
-  createdAt: string
-}
-
-// In-memory storage for compras
-const compras: Compra[] = []
+import { isAuthenticatedAdmin, unauthorizedResponse } from "@/lib/admin-auth"
+import { getSupabaseAdmin } from "@/lib/repositories/supabase-client"
 
 export async function GET(request: Request) {
   if (!isAuthenticatedAdmin(request)) return unauthorizedResponse()
-  const entregues = compras.filter(c => c.status === "entregue")
-  const pendentes = compras.filter(c => c.status === "pendente")
-  const cancelados = compras.filter(c => c.status === "cancelado")
-  
-  const totalVendas = entregues.reduce((acc, c) => acc + c.value, 0)
 
-  return NextResponse.json({
-    compras: compras.sort((a, b) => 
-      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    ),
-    stats: {
-      total: compras.length,
-      entregues: entregues.length,
-      pendentes: pendentes.length,
-      cancelados: cancelados.length,
-      totalVendas
-    }
-  })
-}
-
-export async function POST(request: Request) {
-  if (!isAuthenticatedAdmin(request) && !isInternalRequest(request)) return unauthorizedResponse()
   try {
-    const body = await request.json()
-    const { action, compraId, ...data } = body
+    const supabase = getSupabaseAdmin()
 
-    if (action === "create") {
-      const newCompra: Compra = {
-        id: `compra_${Date.now()}`,
-        userId: data.userId,
-        userName: data.userName,
-        userEmail: data.userEmail,
-        productId: data.productId,
-        productName: data.productName,
-        bin: data.bin,
-        value: data.value,
-        status: "entregue",
-        createdAt: new Date().toISOString()
+    const { data: orders, error } = await supabase
+      .from("orders")
+      .select("id, user_id, user_name, product, level, brand, total, date, status, card_data")
+      .order("date", { ascending: false })
+      .limit(200)
+
+    if (error) throw error
+
+    // Busca emails dos usuários
+    const userIds = [...new Set((orders || []).map((o: any) => o.user_id).filter(Boolean))]
+    let emailMap: Record<string, string> = {}
+
+    if (userIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, email")
+        .in("id", userIds)
+      for (const p of profiles || []) {
+        emailMap[p.id] = p.email
       }
-      compras.push(newCompra)
-      return NextResponse.json({ success: true, compra: newCompra })
     }
 
-    if (action === "update_status" && compraId) {
-      const compra = compras.find(c => c.id === compraId)
-      if (compra) {
-        compra.status = data.status
-        return NextResponse.json({ success: true, compra })
-      }
-      return NextResponse.json({ error: "Compra not found" }, { status: 404 })
-    }
+    const compras = (orders || []).map((o: any) => ({
+      id: o.id,
+      userId: o.user_id,
+      userName: o.user_name || "Cliente",
+      userEmail: emailMap[o.user_id] || "—",
+      productName: o.product || `${o.level} ${o.brand}`,
+      bin: o.card_data?.bin || "—",
+      value: Number(o.total || 0),
+      status: o.status || "entregue",
+      createdAt: o.date,
+    }))
 
-    return NextResponse.json({ error: "Invalid action" }, { status: 400 })
-  } catch (error) {
-    console.error("Error processing compra:", error)
-    return NextResponse.json({ error: "Internal error" }, { status: 500 })
+    const entregues = compras.filter((c) => c.status === "entregue")
+    const pendentes = compras.filter((c) => c.status === "pendente")
+    const cancelados = compras.filter((c) => c.status === "cancelado")
+    const totalVendas = entregues.reduce((acc, c) => acc + c.value, 0)
+
+    return NextResponse.json({
+      compras,
+      stats: {
+        total: compras.length,
+        entregues: entregues.length,
+        pendentes: pendentes.length,
+        cancelados: cancelados.length,
+        totalVendas,
+      },
+    })
+  } catch (err) {
+    console.error("[compras GET]", err)
+    return NextResponse.json({ compras: [], stats: { total: 0, entregues: 0, pendentes: 0, cancelados: 0, totalVendas: 0 } })
   }
-}
-
-export async function DELETE(request: Request) {
-  if (!isAuthenticatedAdmin(request)) return unauthorizedResponse()
-  const { searchParams } = new URL(request.url)
-  const id = searchParams.get("id")
-
-  if (!id) {
-    return NextResponse.json({ error: "ID required" }, { status: 400 })
-  }
-
-  const index = compras.findIndex(c => c.id === id)
-  if (index === -1) {
-    return NextResponse.json({ error: "Compra not found" }, { status: 404 })
-  }
-
-  compras.splice(index, 1)
-  return NextResponse.json({ success: true })
 }

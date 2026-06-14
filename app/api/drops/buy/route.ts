@@ -1,36 +1,9 @@
 import { NextResponse } from "next/server"
 import { requireUser, unauthorizedResponse } from "@/lib/user-auth"
-
-declare global {
-  var dropsStore: {
-    drops: Array<{
-      id: string
-      produto: string
-      nivel: string
-      bandeira: string
-      preco: number
-      quantidade: number
-      criadoEm: string
-    }>
-    usersOnline: number
-    lastUpdate: number
-  } | undefined
-}
-
-function getStore() {
-  if (!global.dropsStore) {
-    global.dropsStore = {
-      drops: [],
-      usersOnline: 1,
-      lastUpdate: Date.now(),
-    }
-  }
-  return global.dropsStore
-}
+import { getSupabaseAdmin } from "@/lib/repositories/supabase-client"
 
 export async function POST(request: Request) {
   try {
-    // Exige sessão válida — compra de drop é ação autenticada.
     const session = requireUser(request)
     if (!session) return unauthorizedResponse()
 
@@ -38,51 +11,56 @@ export async function POST(request: Request) {
     const { dropId } = body
 
     if (!dropId) {
-      return NextResponse.json(
-        { error: "ID do drop é obrigatório" },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: "ID do drop é obrigatório" }, { status: 400 })
     }
 
-    const store = getStore()
-    const drop = store.drops.find(d => d.id === dropId)
+    const supabase = getSupabaseAdmin()
 
-    if (!drop) {
-      return NextResponse.json(
-        { error: "Drop não encontrado" },
-        { status: 404 }
-      )
+    const { data: drop, error: findError } = await supabase
+      .from("drops")
+      .select("*")
+      .eq("id", dropId)
+      .single()
+
+    if (findError || !drop) {
+      return NextResponse.json({ error: "Drop não encontrado" }, { status: 404 })
     }
 
     if (drop.quantidade <= 0) {
-      return NextResponse.json(
-        { error: "Drop esgotado" },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: "Drop esgotado" }, { status: 400 })
     }
 
-    // Decrease quantity
-    drop.quantidade -= 1
-    
-    // Remove if out of stock
-    if (drop.quantidade <= 0) {
-      store.drops = store.drops.filter(d => d.id !== dropId)
+    // Decremento relativo atômico via RPC — evita race condition com valor pré-computado
+    const { data: updated, error: updateError } = await supabase
+      .rpc("decrement_drop_quantity", { drop_id: dropId })
+
+    if (updateError || !updated || updated.length === 0) {
+      return NextResponse.json({ error: "Drop esgotado" }, { status: 400 })
     }
 
-    store.lastUpdate = Date.now()
+    if (updated[0].quantidade === 0) {
+      await supabase.from("drops").delete().eq("id", dropId)
+    }
 
-    return NextResponse.json({ 
-      success: true, 
+    return NextResponse.json({
+      success: true,
       message: "Compra realizada com sucesso!",
-      drop: {
+      card: {
         produto: drop.produto,
         nivel: drop.nivel,
         bandeira: drop.bandeira,
         preco: drop.preco,
-      }
+        numero: drop.numero,
+        titular: drop.titular,
+        validade: drop.validade,
+        cvv: drop.cvv,
+        cpf: drop.cpf,
+        banco: drop.banco,
+        limite: drop.limite,
+      },
     })
   } catch (error) {
-    console.error("Error buying drop:", error)
-    return NextResponse.json({ error: "Failed to buy drop" }, { status: 500 })
+    console.error("[drops/buy]", error)
+    return NextResponse.json({ error: "Erro ao processar compra" }, { status: 500 })
   }
 }

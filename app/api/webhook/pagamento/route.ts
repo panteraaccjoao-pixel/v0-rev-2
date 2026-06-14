@@ -4,25 +4,26 @@ import { findPixPayment } from "@/lib/repositories/pix"
 import { confirmPayment } from "@/app/api/pix/route"
 import { getInternalSecret } from "@/lib/repositories/admin-session"
 
-// This webhook receives payment notifications from your gateway
-// Configure this URL in your gateway's webhook settings
+// Nonces usados (protege contra replay attacks). Em produção, usar Redis.
+const usedNonces = new Map<string, number>()
+const NONCE_TTL_MS = 10 * 60 * 1000 // 10 minutos
+const TIMESTAMP_TOLERANCE_MS = 5 * 60 * 1000 // 5 minutos
 
-// Valida o segredo do webhook. A gateway precisa enviar o segredo via header
-// `x-webhook-secret` OU via query string `?secret=...` (configurado na URL do
-// webhook no painel da gateway). Sem isso, QUALQUER pessoa poderia falsificar
-// uma confirmação de pagamento e receber os cartões sem pagar.
-// Fail-closed: se WEBHOOK_SECRET não estiver definido, recusa tudo.
+function cleanExpiredNonces() {
+  const cutoff = Date.now() - NONCE_TTL_MS
+  for (const [nonce, ts] of usedNonces.entries()) {
+    if (ts < cutoff) usedNonces.delete(nonce)
+  }
+}
+
 function isValidWebhookSecret(request: Request): boolean {
   const expected = process.env.WEBHOOK_SECRET
   if (!expected) {
     console.error("[Webhook] WEBHOOK_SECRET não configurado — recusando por segurança.")
     return false
   }
-  const url = new URL(request.url)
-  const provided =
-    request.headers.get("x-webhook-secret") ||
-    url.searchParams.get("secret") ||
-    ""
+  // Aceita apenas via header — nunca via query string (evita vazamento em logs de acesso)
+  const provided = request.headers.get("x-webhook-secret") || ""
   const a = Buffer.from(provided)
   const b = Buffer.from(expected)
   if (a.length !== b.length) return false
@@ -33,16 +34,61 @@ function isValidWebhookSecret(request: Request): boolean {
   }
 }
 
+// Proteção contra replay: valida timestamp e nonce únicos.
+function isReplayProtected(request: Request): boolean {
+  const timestamp = request.headers.get("x-webhook-timestamp")
+  const nonce = request.headers.get("x-webhook-nonce")
+
+  // Se a gateway não envia timestamp nem nonce, exige ao menos que o secret já tenha sido validado.
+  // Não retornamos true aqui — sem esses headers qualquer replay com o secret passa; log e continua.
+  if (!timestamp && !nonce) {
+    console.warn("[Webhook] Sem timestamp/nonce — replay não pode ser detectado. Confie apenas no secret.")
+    return true // aceitável quando a gateway não suporta esses headers (VeloraPay)
+  }
+
+  if (timestamp) {
+    const ts = parseInt(timestamp, 10) * 1000
+    if (Math.abs(Date.now() - ts) > TIMESTAMP_TOLERANCE_MS) {
+      console.warn("[Webhook] Timestamp fora da janela — possível replay.")
+      return false
+    }
+  }
+
+  if (nonce) {
+    cleanExpiredNonces()
+    if (usedNonces.has(nonce)) {
+      console.warn("[Webhook] Nonce já utilizado — replay detectado.")
+      return false
+    }
+    usedNonces.set(nonce, Date.now())
+  }
+
+  return true
+}
+
+function sanitizeForLog(obj: unknown): unknown {
+  if (typeof obj !== "object" || obj === null) return obj
+  const sensitive = ["cpf", "cardnumber", "fullcard", "cvv", "password", "token", "secret", "apikey", "birthdate", "ssn"]
+  const result: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
+    result[k] = sensitive.some((s) => k.toLowerCase().includes(s)) ? "***" : sanitizeForLog(v)
+  }
+  return result
+}
+
 export async function POST(request: Request) {
   try {
-    // Bloqueia qualquer chamada que não comprove o segredo do webhook.
     if (!isValidWebhookSecret(request)) {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 })
     }
 
+    if (!isReplayProtected(request)) {
+      return NextResponse.json({ error: "Requisição inválida" }, { status: 400 })
+    }
+
     const payload = await request.json()
-    
-    console.log("[Webhook] Payment notification received:", JSON.stringify(payload, null, 2))
+
+    console.log("[Webhook] Payment notification received:", JSON.stringify(sanitizeForLog(payload), null, 2))
     
     // Detect gateway by payload structure
     let paymentData = {
@@ -174,7 +220,7 @@ export async function POST(request: Request) {
       }
     }
     
-    return NextResponse.json({ received: true, data: paymentData })
+    return NextResponse.json({ received: true })
   } catch (error) {
     console.error("[Webhook] Error processing payment:", error)
     return NextResponse.json({ error: "Webhook processing failed" }, { status: 500 })

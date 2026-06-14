@@ -32,6 +32,7 @@ const platformItems = [
 
 const resourceItems = [
   { name: "Drops", href: "/dashboard/drops", icon: Gift },
+  { name: "Gifts", href: "/dashboard/gifts", icon: Gift },
   { name: "Avaliações", href: "/dashboard/avaliacoes", icon: Star },
   { name: "Trocas", href: "/dashboard/trocas", icon: RefreshCw },
 ]
@@ -42,7 +43,7 @@ const communityItems = [
 
 const supportItems = [
   { name: "Configurações", href: "/dashboard/configuracoes", icon: Settings },
-  { name: "Dúvidas Frequentes", href: "/duvidas", icon: HelpCircle },
+  { name: "Dúvidas Frequentes", href: "/duvidas", icon: HelpCircle, external: true },
   { name: "Termos", href: "/dashboard/termos", icon: FileText },
 ]
 
@@ -64,11 +65,6 @@ export default function DashboardLayout({
       if (!active) return
       setCheckingAuth(false)
       router.replace("/login")
-      setTimeout(() => {
-        if (window.location.pathname.startsWith("/dashboard")) {
-          window.location.href = "/login"
-        }
-      }, 400)
     }
 
     const checkAuth = async () => {
@@ -166,17 +162,22 @@ export default function DashboardLayout({
       <nav className="space-y-1">
         {items.map((item) => {
           const isActive = pathname === item.href
+          const cls = cn(
+            "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+            isActive
+              ? "bg-accent/10 text-accent"
+              : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+          )
+          if ((item as any).external) {
+            return (
+              <a key={item.name} href={item.href} target="_blank" rel="noopener noreferrer" className={cls}>
+                <item.icon className="h-4 w-4" />
+                {item.name}
+              </a>
+            )
+          }
           return (
-            <Link
-              key={item.name}
-              href={item.href}
-              className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                isActive
-                  ? "bg-accent/10 text-accent"
-                  : "text-muted-foreground hover:bg-secondary hover:text-foreground"
-              )}
-            >
+            <Link key={item.name} href={item.href} className={cls}>
               <item.icon className="h-4 w-4" />
               {item.name}
             </Link>

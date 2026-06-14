@@ -21,11 +21,6 @@ export default function LoginPage() {
     e.preventDefault()
     setError("")
 
-    if (!captchaToken) {
-      setError("Confirme que você não é um robô.")
-      return
-    }
-
     setLoading(true)
 
     try {
@@ -145,7 +140,7 @@ export default function LoginPage() {
             <Button 
               type="submit" 
               className="h-12 w-full bg-secondary text-secondary-foreground hover:bg-secondary/80"
-              disabled={loading}
+              disabled={loading || !captchaToken}
             >
               {loading ? "Entrando..." : "Entrar"}
             </Button>

@@ -7,12 +7,11 @@ const ipRequestCounts = new Map<string, { count: number; resetTime: number }>()
 function getClientIP(request: NextRequest): string {
   const forwardedFor = request.headers.get("x-forwarded-for")
   if (forwardedFor) {
-    return forwardedFor.split(",")[0].trim()
+    const first = forwardedFor.split(",")[0].trim()
+    if (first) return first
   }
   const realIP = request.headers.get("x-real-ip")
-  if (realIP) {
-    return realIP
-  }
+  if (realIP) return realIP.trim()
   return "unknown"
 }
 

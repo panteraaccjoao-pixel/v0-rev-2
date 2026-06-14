@@ -23,6 +23,8 @@ interface Feedback {
   productName: string
   rating: number
   comment: string
+  helpful: number
+  imageUrl: string | null
   createdAt: string
 }
 
@@ -238,6 +240,18 @@ export default function FeedbacksPage() {
                   </div>
                 </div>
                 <p className="mt-3 text-sm">{feedback.comment}</p>
+
+                {feedback.imageUrl && (
+                  <div className="mt-3">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={feedback.imageUrl}
+                      alt={`Foto de ${feedback.userName}`}
+                      className="max-h-48 w-auto rounded-lg border border-border object-cover"
+                      loading="lazy"
+                    />
+                  </div>
+                )}
               </CardContent>
             </Card>
           ))}

@@ -1,34 +1,6 @@
 import { NextResponse } from "next/server"
 import { isAuthenticatedAdmin, unauthorizedResponse } from "@/lib/admin-auth"
-
-// Armazenamento em memória dos gifts (compartilhado entre requisições).
-// ATENÇÃO: volátil — reinicia quando o servidor reinicia.
-declare global {
-  var giftsStore:
-    | {
-        gifts: Array<{
-          id: string
-          code: string
-          value: number
-          status: "disponível" | "resgatado"
-          createdAt: string
-          usedBy: string | null
-          usedAt: string | null
-        }>
-        lastUpdate: number
-      }
-    | undefined
-}
-
-function getStore() {
-  if (!global.giftsStore) {
-    global.giftsStore = {
-      gifts: [],
-      lastUpdate: Date.now(),
-    }
-  }
-  return global.giftsStore
-}
+import { getSupabaseAdmin } from "@/lib/repositories/supabase-client"
 
 function generateCode() {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
@@ -39,83 +11,86 @@ function generateCode() {
   return `GIFT-${result}`
 }
 
-// Lista todos os gifts (somente admin — expõe códigos)
 export async function GET(request: Request) {
-  if (!isAuthenticatedAdmin(request)) {
-    return unauthorizedResponse()
-  }
+  if (!isAuthenticatedAdmin(request)) return unauthorizedResponse()
+
   try {
-    const store = getStore()
-    return NextResponse.json({
-      gifts: store.gifts,
-      lastUpdate: store.lastUpdate,
-    })
+    const supabase = getSupabaseAdmin()
+    const { data, error } = await supabase
+      .from("gifts")
+      .select("id, code, amount, used, used_by, used_at, created_at")
+      .order("created_at", { ascending: false })
+      .limit(500)
+
+    if (error) throw error
+
+    const gifts = (data || []).map((g: any) => ({
+      id: g.id,
+      code: g.code,
+      value: Number(g.amount),
+      status: g.used ? "resgatado" : "disponível",
+      createdAt: g.created_at,
+      usedBy: g.used_by || null,
+      usedAt: g.used_at || null,
+    }))
+
+    return NextResponse.json({ gifts })
   } catch (error) {
-    console.error("Error fetching gifts:", error)
-    return NextResponse.json({ error: "Failed to fetch gifts" }, { status: 500 })
+    console.error("[gifts GET]", error)
+    return NextResponse.json({ gifts: [] })
   }
 }
 
-// Cria um ou mais gifts (somente admin)
 export async function POST(request: Request) {
-  if (!isAuthenticatedAdmin(request)) {
-    return unauthorizedResponse()
-  }
+  if (!isAuthenticatedAdmin(request)) return unauthorizedResponse()
+
   try {
     const body = await request.json()
-    const value = Number.parseFloat(body.value)
-    const quantity = Math.min(Math.max(Number.parseInt(body.quantity || "1"), 1), 100)
+    const value = parseFloat(body.value)
+    const quantity = Math.min(Math.max(parseInt(body.quantity || "1"), 1), 100)
 
     if (!value || value <= 0) {
       return NextResponse.json({ error: "Valor inválido" }, { status: 400 })
     }
 
-    const store = getStore()
-    const created = []
+    const supabase = getSupabaseAdmin()
+    const rows = []
 
     for (let i = 0; i < quantity; i++) {
-      const gift = {
+      rows.push({
         id: `gift_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
         code: generateCode(),
-        value,
-        status: "disponível" as const,
-        createdAt: new Date().toISOString(),
-        usedBy: null,
-        usedAt: null,
-      }
-      store.gifts.unshift(gift)
-      created.push(gift)
+        amount: value,
+      })
+      // Pequeno delay para garantir IDs únicos quando quantity > 1
+      await new Promise((r) => setTimeout(r, 1))
     }
 
-    store.lastUpdate = Date.now()
+    const { data, error } = await supabase.from("gifts").insert(rows).select()
+    if (error) throw error
 
-    return NextResponse.json({ success: true, gifts: created })
+    return NextResponse.json({ success: true, gifts: data })
   } catch (error) {
-    console.error("Error creating gift:", error)
-    return NextResponse.json({ error: "Failed to create gift" }, { status: 500 })
+    console.error("[gifts POST]", error)
+    return NextResponse.json({ error: "Erro ao criar gift" }, { status: 500 })
   }
 }
 
-// Exclui um gift (somente admin)
 export async function DELETE(request: Request) {
-  if (!isAuthenticatedAdmin(request)) {
-    return unauthorizedResponse()
-  }
+  if (!isAuthenticatedAdmin(request)) return unauthorizedResponse()
+
   try {
     const { searchParams } = new URL(request.url)
-    const giftId = searchParams.get("id")
+    const id = searchParams.get("id")
+    if (!id) return NextResponse.json({ error: "ID obrigatório" }, { status: 400 })
 
-    if (!giftId) {
-      return NextResponse.json({ error: "ID do gift é obrigatório" }, { status: 400 })
-    }
-
-    const store = getStore()
-    store.gifts = store.gifts.filter((g) => g.id !== giftId)
-    store.lastUpdate = Date.now()
+    const supabase = getSupabaseAdmin()
+    const { error } = await supabase.from("gifts").delete().eq("id", id).eq("used", false)
+    if (error) throw error
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error("Error deleting gift:", error)
-    return NextResponse.json({ error: "Failed to delete gift" }, { status: 500 })
+    console.error("[gifts DELETE]", error)
+    return NextResponse.json({ error: "Erro ao excluir gift" }, { status: 500 })
   }
 }

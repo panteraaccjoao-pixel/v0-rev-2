@@ -1,84 +1,63 @@
 import { NextResponse } from "next/server"
-import { isAuthenticatedAdmin, isInternalRequest, unauthorizedResponse } from "@/lib/admin-auth"
-
-interface Feedback {
-  id: string
-  userId: string
-  userName: string
-  userEmail: string
-  productId: string
-  productName: string
-  rating: number
-  comment: string
-  createdAt: string
-}
-
-// In-memory storage for feedbacks
-const feedbacks: Feedback[] = []
+import { isAuthenticatedAdmin, unauthorizedResponse } from "@/lib/admin-auth"
+import { getSupabaseAdmin } from "@/lib/repositories/supabase-client"
 
 export async function GET(request: Request) {
   if (!isAuthenticatedAdmin(request)) return unauthorizedResponse()
-  const totalRating = feedbacks.reduce((acc, f) => acc + f.rating, 0)
-  const averageRating = feedbacks.length > 0 ? totalRating / feedbacks.length : 0
-  const positivos = feedbacks.filter(f => f.rating >= 4).length
-  const negativos = feedbacks.filter(f => f.rating < 4).length
 
-  return NextResponse.json({
-    feedbacks: feedbacks.sort((a, b) => 
-      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    ),
-    stats: {
-      total: feedbacks.length,
-      averageRating,
-      positivos,
-      negativos
-    }
-  })
-}
-
-export async function POST(request: Request) {
-  if (!isAuthenticatedAdmin(request) && !isInternalRequest(request)) return unauthorizedResponse()
   try {
-    const body = await request.json()
-    const { action, ...data } = body
+    const supabase = getSupabaseAdmin()
+    const { data, error } = await supabase
+      .from("reviews")
+      .select("id, username, rating, comment, product_type, price, created_at, helpful, image_url")
+      .order("created_at", { ascending: false })
+      .limit(500)
 
-    if (action === "create") {
-      const newFeedback: Feedback = {
-        id: `feedback_${Date.now()}`,
-        userId: data.userId,
-        userName: data.userName,
-        userEmail: data.userEmail,
-        productId: data.productId,
-        productName: data.productName,
-        rating: data.rating,
-        comment: data.comment,
-        createdAt: new Date().toISOString()
-      }
-      feedbacks.push(newFeedback)
-      return NextResponse.json({ success: true, feedback: newFeedback })
-    }
+    if (error) throw error
 
-    return NextResponse.json({ error: "Invalid action" }, { status: 400 })
+    const feedbacks = (data || []).map((r: any) => ({
+      id: r.id,
+      userId: "",
+      userName: r.username,
+      userEmail: "",
+      productId: "",
+      productName: r.product_type || "",
+      rating: r.rating,
+      comment: r.comment,
+      helpful: r.helpful ?? 0,
+      imageUrl: r.image_url ?? null,
+      createdAt: r.created_at,
+    }))
+
+    const total = feedbacks.length
+    const avgRating = total > 0 ? feedbacks.reduce((acc, f) => acc + f.rating, 0) / total : 0
+    const positivos = feedbacks.filter((f) => f.rating >= 4).length
+    const negativos = feedbacks.filter((f) => f.rating < 4).length
+
+    return NextResponse.json({
+      feedbacks,
+      stats: { total, averageRating: Math.round(avgRating * 10) / 10, positivos, negativos },
+    })
   } catch (error) {
-    console.error("Error processing feedback:", error)
-    return NextResponse.json({ error: "Internal error" }, { status: 500 })
+    console.error("[feedbacks GET]", error)
+    return NextResponse.json({ feedbacks: [], stats: { total: 0, averageRating: 0, positivos: 0, negativos: 0 } })
   }
 }
 
 export async function DELETE(request: Request) {
   if (!isAuthenticatedAdmin(request)) return unauthorizedResponse()
+
   const { searchParams } = new URL(request.url)
   const id = searchParams.get("id")
+  if (!id) return NextResponse.json({ error: "ID obrigatório" }, { status: 400 })
 
-  if (!id) {
-    return NextResponse.json({ error: "ID required" }, { status: 400 })
+  try {
+    const supabase = getSupabaseAdmin()
+    const { error } = await supabase.from("reviews").delete().eq("id", id)
+    if (error) throw error
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error("[feedbacks DELETE]", error)
+    return NextResponse.json({ error: "Erro ao excluir" }, { status: 500 })
   }
-
-  const index = feedbacks.findIndex(f => f.id === id)
-  if (index === -1) {
-    return NextResponse.json({ error: "Feedback not found" }, { status: 404 })
-  }
-
-  feedbacks.splice(index, 1)
-  return NextResponse.json({ success: true })
 }

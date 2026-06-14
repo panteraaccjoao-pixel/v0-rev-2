@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { Star, ThumbsUp, MessageCircle, CreditCard, ImagePlus, X } from "lucide-react"
+import { Recaptcha } from "@/components/recaptcha"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { authFetch } from "@/lib/session"
@@ -67,6 +68,7 @@ export default function AvaliacoesPage() {
     productType: "Standard",
     price: "",
   })
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null)
 
   const fetchReviews = async () => {
     try {
@@ -114,6 +116,7 @@ export default function AvaliacoesPage() {
 
   const resetForm = () => {
     setNewReview({ rating: 5, comment: "", productType: "Standard", price: "" })
+    setCaptchaToken(null)
     handleRemoveImage()
   }
 
@@ -150,6 +153,7 @@ export default function AvaliacoesPage() {
           productType: newReview.productType,
           price: parseFloat(newReview.price) || 0,
           imageUrl,
+          captchaToken,
         }),
       })
 
@@ -351,6 +355,9 @@ export default function AvaliacoesPage() {
               )}
               {uploadError && <p className="text-sm text-destructive">{uploadError}</p>}
             </div>
+
+            {/* reCAPTCHA */}
+            <Recaptcha onChange={setCaptchaToken} theme="dark" />
 
             {/* Submit Button */}
             <Button
