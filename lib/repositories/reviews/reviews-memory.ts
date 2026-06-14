@@ -114,3 +114,11 @@ export async function markReviewHelpful(reviewId: string): Promise<number | null
   review.helpful += 1
   return review.helpful
 }
+
+// Remove uma avaliação pelo id (ação de admin). Retorna true se removeu.
+export async function deleteReview(reviewId: string): Promise<boolean> {
+  const index = reviews.findIndex((r) => r.id === reviewId)
+  if (index === -1) return false
+  reviews.splice(index, 1)
+  return true
+}
