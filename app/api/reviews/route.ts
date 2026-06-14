@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { listReviews, addReview, markReviewHelpful } from "@/lib/repositories/reviews"
+import { listReviews, addReview, markReviewHelpful, deleteReview } from "@/lib/repositories/reviews"
 import { requireUser, unauthorizedResponse } from "@/lib/user-auth"
+import { isAuthenticatedAdmin } from "@/lib/admin-auth"
 
 export async function GET(request: NextRequest) {
   try {
@@ -67,5 +68,28 @@ export async function PATCH(request: NextRequest) {
   } catch (error) {
     console.error("Error updating review:", error)
     return NextResponse.json({ error: "Erro ao atualizar" }, { status: 500 })
+  }
+}
+
+// DELETE - remove uma avaliação. Restrito a admin autenticado.
+export async function DELETE(request: NextRequest) {
+  try {
+    if (!isAuthenticatedAdmin(request)) return unauthorizedResponse()
+
+    const { searchParams } = new URL(request.url)
+    const reviewId = searchParams.get("id")
+    if (!reviewId) {
+      return NextResponse.json({ error: "ID da avaliação é obrigatório" }, { status: 400 })
+    }
+
+    const removed = await deleteReview(reviewId)
+    if (!removed) {
+      return NextResponse.json({ error: "Avaliação não encontrada" }, { status: 404 })
+    }
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error("Error deleting review:", error)
+    return NextResponse.json({ error: "Erro ao remover avaliação" }, { status: 500 })
   }
 }

@@ -16,3 +16,4 @@ const impl = isSupabaseEnabled() ? supabase : memory
 export const listReviews = impl.listReviews
 export const addReview = impl.addReview
 export const markReviewHelpful = impl.markReviewHelpful
+export const deleteReview = impl.deleteReview

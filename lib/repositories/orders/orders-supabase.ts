@@ -44,10 +44,16 @@ export async function createOrder(data: CreateOrderInput): Promise<Order> {
 }
 
 export async function listOrders(filter?: ListOrdersFilter): Promise<Order[]> {
+  // Defesa em profundidade: sem um filtro de dono (userId/email), NUNCA devolve
+  // todos os pedidos do sistema. Listar tudo só é possível via chamada explícita.
+  if (!filter || (!filter.userId && !filter.email)) {
+    return []
+  }
+
   const supabase = getSupabaseAdmin()
   let query = supabase.from(TABLE).select("*").order("date", { ascending: false })
 
-  if (filter && (filter.userId || filter.email)) {
+  {
     // user_id pode guardar o id do perfil OU o email; casa qualquer um dos dois.
     const candidates = [filter.userId, filter.email]
       .filter(Boolean)

@@ -117,3 +117,15 @@ export async function markReviewHelpful(reviewId: string): Promise<number | null
 
   return newHelpful
 }
+
+// Remove uma avaliação pelo id (ação de admin). Retorna true se removeu.
+export async function deleteReview(reviewId: string): Promise<boolean> {
+  const supabase = getSupabaseAdmin()
+  const { data, error } = await supabase
+    .from(TABLE)
+    .delete()
+    .eq("id", reviewId)
+    .select("id")
+  if (error) throw new Error(`deleteReview: ${error.message}`)
+  return (data?.length ?? 0) > 0
+}
