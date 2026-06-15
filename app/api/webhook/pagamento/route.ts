@@ -22,8 +22,13 @@ function isValidWebhookSecret(request: Request): boolean {
     console.error("[Webhook] WEBHOOK_SECRET não configurado — recusando por segurança.")
     return false
   }
-  // Aceita apenas via header — nunca via query string (evita vazamento em logs de acesso)
-  const provided = request.headers.get("x-webhook-secret") || ""
+  // Aceita via header (preferido) ou query string (necessário para gateways como VeloraPay
+  // que não suportam headers customizados — o secret viaja em HTTPS, não em logs de browser).
+  const url = new URL(request.url)
+  const provided =
+    request.headers.get("x-webhook-secret") ||
+    url.searchParams.get("s") ||
+    ""
   const a = Buffer.from(provided)
   const b = Buffer.from(expected)
   if (a.length !== b.length) return false

@@ -18,6 +18,7 @@ export async function POST(request: NextRequest) {
 
     const captchaOk = await verifyRecaptcha(captchaToken)
     if (!captchaOk) {
+      console.error("[send-verification] captcha falhou para IP:", ip)
       return NextResponse.json(
         { success: false, message: "Falha na verificação do captcha." },
         { status: 400 }
