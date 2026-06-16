@@ -207,7 +207,7 @@ as $$
   returning *;
 $$;
 
--- Registra compra (incrementa purchases, total_spent e decrementa saldo)
+-- Registra compra (incrementa purchases e total_spent — saldo é descontado no checkout)
 create or replace function record_purchase(p_user_id text, p_amount numeric)
 returns setof profiles
 language sql
@@ -215,8 +215,7 @@ as $$
   update profiles
   set
     purchases   = purchases + 1,
-    total_spent = total_spent + p_amount,
-    balance     = balance - p_amount
+    total_spent = total_spent + p_amount
   where id = p_user_id
   returning *;
 $$;
