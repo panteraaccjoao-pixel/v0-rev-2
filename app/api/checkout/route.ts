@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { checkRateLimit, getClientIP } from "@/lib/rate-limit"
 import { rateLimitResponse } from "@/lib/security"
 import { createPix } from "@/lib/pix-gateway"
-import { getUserByEmail, setBalance } from "@/lib/repositories/users"
+import { getUserByEmail, setBalance, addBalance } from "@/lib/repositories/users"
 import { findMatchingStock, removeStockById } from "@/lib/repositories/stock"
 import { addPixPayment } from "@/lib/repositories/pix"
 import type { Product, PixPayment } from "@/lib/repositories/types"
@@ -93,8 +93,8 @@ export async function POST(request: NextRequest) {
 
     // 3. Pagamento com saldo (cobre total, inclusive total = 0).
     if (profile && balance >= total) {
-      // Desconta o saldo.
-      await setBalance(profile.id, balance - total)
+      // Desconta o saldo atomicamente (evita race condition e dupla dedução).
+      await addBalance(profile.id, -total)
 
       // Baixa o estoque (remove os cartões vendidos).
       const removed: Product[] = []
@@ -120,7 +120,7 @@ export async function POST(request: NextRequest) {
         paid: true,
         cards: delivered,
         total,
-        newBalance: balance - total,
+        newBalance: balance - total, // aproximado; valor real vem do banco
       })
     }
 
