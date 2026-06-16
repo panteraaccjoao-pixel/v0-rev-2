@@ -2,20 +2,13 @@ import { NextRequest, NextResponse } from "next/server"
 import { createUser, getUserByEmail } from "@/lib/repositories/users"
 import { sanitizeInput } from "@/lib/security"
 import { createUserToken, USER_SESSION_COOKIE, sessionCookieOptions } from "@/lib/user-session"
-import { verifyRecaptcha } from "@/lib/recaptcha"
 
 export async function POST(request: NextRequest) {
   try {
-    const { name, email, password, captchaToken } = await request.json()
-
-    // Valida o captcha no servidor (a secret nunca sai daqui).
-    const captchaOk = await verifyRecaptcha(captchaToken)
-    if (!captchaOk) {
-      return NextResponse.json(
-        { success: false, message: "Falha na verificação do captcha. Tente novamente." },
-        { status: 400 }
-      )
-    }
+    // Captcha não é verificado aqui: já foi verificado em send-verification.
+    // O token reCAPTCHA é de uso único — reusar causaria falha garantida.
+    // A verificação do email (código de 6 dígitos) prova que o usuário é humano.
+    const { name, email, password } = await request.json()
 
     if (!name || !email || !password) {
       return NextResponse.json(
